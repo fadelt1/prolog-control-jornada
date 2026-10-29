@@ -1,0 +1,3217 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Prolog Control de Jornada · CER_YPE</title>
+
+  <!-- Google Fonts: Plus Jakarta Sans & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'system-ui', '-apple-system', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'monospace'],
+          },
+          colors: {
+            brand: {
+              50: '#eff6ff',
+              100: '#dbeafe',
+              500: '#3b82f6',
+              600: '#2563eb',
+              700: '#1d4ed8',
+            }
+          }
+        }
+      }
+    };
+  </script>
+
+  <!-- Leaflet Maps (CSS & JS) para Mapa GPS Directo y Creador de Geocercas Poligonales -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <!-- SheetJS (xlsx-js-style) para Exportación de Relatorios y Matriz P/DL -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
+
+  <style>
+    body {
+      background-color: #f3f6fc;
+      color: #0f172a;
+      font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    }
+    .saas-card {
+      background: #ffffff;
+      border-radius: 20px;
+      border: 1px solid #e6edf5;
+      box-shadow: 0 10px 30px -5px rgba(15, 23, 42, 0.035), 0 4px 12px -2px rgba(15, 23, 42, 0.02);
+    }
+    .saas-subcard {
+      background: #f8fafd;
+      border-radius: 14px;
+      border: 1px solid #e2e8f0;
+    }
+    .nav-btn {
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .nav-btn.active {
+      background: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%);
+      color: #ffffff;
+      box-shadow: 0 8px 20px -4px rgba(37, 99, 235, 0.45);
+    }
+    .nav-btn:not(.active):hover {
+      background-color: #eff6ff;
+      color: #2563eb;
+    }
+    ::-webkit-scrollbar {
+      width: 7px;
+      height: 7px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #f1f5f9;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
+    }
+    .leaflet-container {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      border-radius: 16px;
+    }
+  </style>
+</head>
+<body class="min-h-screen antialiased selection:bg-blue-600 selection:text-white">
+
+  <!-- ========================================================================= -->
+  <!-- PANTALLA DE LOGIN MINIMALISTA (PROLOG)                                    -->
+  <!-- ========================================================================= -->
+  <div id="loginScreen" class="fixed inset-0 z-50 flex items-center justify-center bg-[#f3f6fc] p-4">
+    <div class="saas-card w-full max-w-md p-8 sm:p-10">
+      <div class="flex flex-col items-center text-center">
+        <div class="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-600 text-white shadow-lg shadow-blue-600/30">
+          <svg class="h-7 w-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+            <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+          </svg>
+        </div>
+        <h1 class="mt-5 text-2xl font-extrabold tracking-tight text-slate-900">Control de Jornada</h1>
+        <p class="mt-1 text-xs font-medium text-slate-500">Prolog App · Unidad 617 (CER_YPE · Motoristas)</p>
+      </div>
+
+      <form onsubmit="handleLoginSubmit(event)" class="mt-8 space-y-5">
+        <div>
+          <label class="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-500">Usuario / CPF Prolog</label>
+          <input id="loginUser" type="text" required value="00007097243"
+            class="w-full rounded-xl border border-slate-200 bg-slate-50/70 px-4 py-3 font-mono text-sm font-semibold text-slate-900 transition focus:border-blue-600 focus:bg-white focus:outline-none focus:ring-4 focus:ring-blue-500/10"
+            placeholder="00007097243" />
+        </div>
+
+        <div>
+          <label class="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-500">Contraseña</label>
+          <input id="loginPass" type="password" required value="04022001"
+            class="w-full rounded-xl border border-slate-200 bg-slate-50/70 px-4 py-3 font-mono text-sm font-semibold text-slate-900 transition focus:border-blue-600 focus:bg-white focus:outline-none focus:ring-4 focus:ring-blue-500/10"
+            placeholder="••••••••" />
+        </div>
+
+        <div id="loginErrorBox" class="hidden rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs font-semibold text-rose-600"></div>
+
+        <button id="btnLoginSubmit" type="submit"
+          class="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-5 py-3.5 text-sm font-bold text-white shadow-lg shadow-blue-600/25 transition hover:brightness-105 active:scale-[0.99]">
+          <span>Ingresar al Panel</span>
+          <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- LAYOUT PRINCIPAL DEL DASHBOARD (ESTILO ANALYTICS MINIMALISTA)             -->
+  <!-- ========================================================================= -->
+  <div id="appShell" class="hidden min-h-screen flex">
+
+    <!-- BARRA LATERAL IZQUIERDA (ICON SIDEBAR + LABELS) -->
+    <aside class="sticky top-0 flex h-screen w-20 lg:w-64 shrink-0 flex-col justify-between border-r border-slate-200/80 bg-white px-3 py-6 shadow-sm z-30">
+      <div class="space-y-7">
+        <!-- Perfil / Marca Superior -->
+        <div class="flex items-center gap-3 px-2">
+          <div class="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-600 text-white font-bold shadow-md shadow-blue-600/20">
+            <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+              <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+            </svg>
+            <span class="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-white bg-emerald-500"></span>
+          </div>
+          <div class="hidden lg:block overflow-hidden">
+            <p class="truncate text-sm font-extrabold text-slate-900">Control Jornada</p>
+            <p id="sidebarUserLabel" class="truncate text-[11px] font-medium text-slate-400">CER_YPE · Unid. 617</p>
+          </div>
+        </div>
+
+        <!-- Menú de Navegación -->
+        <nav class="space-y-1.5">
+          <button type="button" onclick="switchModule('ABIERTAS')" id="navBtn_ABIERTAS"
+            class="nav-btn active flex w-full items-center gap-3.5 rounded-2xl px-3.5 py-3 text-xs font-bold text-slate-600">
+            <svg class="h-5 w-5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+            </svg>
+            <span class="hidden lg:inline">Jornadas Abiertas</span>
+            <span id="navBadgeAbiertas" class="hidden lg:inline-flex ml-auto rounded-full bg-white/20 px-2 py-0.5 font-mono text-[11px]">0</span>
+          </button>
+
+          <button type="button" onclick="switchModule('INTERJORNADA')" id="navBtn_INTERJORNADA"
+            class="nav-btn flex w-full items-center gap-3.5 rounded-2xl px-3.5 py-3 text-xs font-bold text-slate-600">
+            <svg class="h-5 w-5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>
+            </svg>
+            <span class="hidden lg:inline">Interjornada (12h)</span>
+            <span id="navBadgeInterjornada" class="hidden lg:inline-flex ml-auto rounded-full bg-slate-100 px-2 py-0.5 font-mono text-[11px] text-slate-600">0</span>
+          </button>
+
+          <button type="button" onclick="switchModule('DIAS_TRABAJADOS')" id="navBtn_DIAS_TRABAJADOS"
+            class="nav-btn flex w-full items-center gap-3.5 rounded-2xl px-3.5 py-3 text-xs font-bold text-slate-600">
+            <svg class="h-5 w-5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect width="18" height="18" x="3" y="4" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/><path d="M8 14h.01"/><path d="M12 14h.01"/><path d="M16 14h.01"/><path d="M8 18h.01"/><path d="M12 18h.01"/><path d="M16 18h.01"/>
+            </svg>
+            <span class="hidden lg:inline">Días Trabajados (P/DL)</span>
+          </button>
+
+          <button type="button" onclick="switchModule('TURNOS')" id="navBtn_TURNOS"
+            class="nav-btn flex w-full items-center gap-3.5 rounded-2xl px-3.5 py-3 text-xs font-bold text-slate-600">
+            <svg class="h-5 w-5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/>
+            </svg>
+            <span class="hidden lg:inline">Control de Turnos</span>
+          </button>
+
+          <button type="button" onclick="switchModule('USUARIOS')" id="navBtn_USUARIOS"
+            class="nav-btn flex w-full items-center gap-3.5 rounded-2xl px-3.5 py-3 text-xs font-bold text-slate-600">
+            <svg class="h-5 w-5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+            </svg>
+            <span class="hidden lg:inline">Usuarios (Choferes)</span>
+            <span id="navBadgeUsuarios" class="hidden lg:inline-flex ml-auto rounded-full bg-slate-100 px-2 py-0.5 font-mono text-[11px] text-slate-600">80</span>
+          </button>
+
+          <button type="button" onclick="switchModule('RELATORIOS')" id="navBtn_RELATORIOS"
+            class="nav-btn flex w-full items-center gap-3.5 rounded-2xl px-3.5 py-3 text-xs font-bold text-slate-600">
+            <svg class="h-5 w-5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>
+            </svg>
+            <span class="hidden lg:inline">Relatorios & Anomalías</span>
+          </button>
+
+          <button type="button" onclick="switchModule('GEOCERCAS')" id="navBtn_GEOCERCAS"
+            class="nav-btn flex w-full items-center gap-3.5 rounded-2xl px-3.5 py-3 text-xs font-bold text-slate-600">
+            <svg class="h-5 w-5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/>
+            </svg>
+            <span class="hidden lg:inline">Ajustes · Geocercas</span>
+            <span id="navBadgeGeocercas" class="hidden lg:inline-flex ml-auto rounded-full bg-blue-50 px-2 py-0.5 font-mono text-[11px] text-blue-600">0</span>
+          </button>
+        </nav>
+      </div>
+
+      <!-- Pie de Barra Lateral: Estado y Cerrar Sesión -->
+      <div class="space-y-3 border-t border-slate-100 pt-4">
+        <div class="hidden lg:flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2 text-[11px]">
+          <span class="font-semibold text-slate-500">Auto-Sync (15s)</span>
+          <span id="syncCountdownLabel" class="font-mono font-bold text-blue-600">15s</span>
+        </div>
+        <button type="button" onclick="handleLogout()"
+          class="flex w-full items-center gap-3 rounded-xl px-3.5 py-2.5 text-xs font-bold text-slate-400 transition hover:bg-rose-50 hover:text-rose-600">
+          <svg class="h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
+          </svg>
+          <span class="hidden lg:inline">Cerrar Sesión</span>
+        </button>
+      </div>
+    </aside>
+
+    <!-- CONTENIDO CENTRAL -->
+    <div class="flex-1 flex flex-col min-w-0">
+
+      <!-- CABECERA SUPERIOR MINIMALISTA -->
+      <header class="sticky top-0 z-20 flex flex-wrap items-center justify-between gap-4 border-b border-slate-200/70 bg-[#f3f6fc]/90 px-6 py-4 backdrop-blur-md">
+        <div>
+          <div class="flex items-center gap-2.5">
+            <span class="text-xs font-bold uppercase tracking-wider text-blue-600">Prolog · CER_YPE</span>
+            <span id="headerSubtitleDot" class="hidden text-slate-300">•</span>
+            <span id="headerSubtitleBadge" class="hidden text-xs font-semibold text-slate-500"></span>
+          </div>
+          <h2 id="headerModuleTitle" class="text-xl font-extrabold tracking-tight text-slate-900">Jornadas Abiertas en Tiempo Real</h2>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-3">
+          <!-- Buscador Minimalista tipo Píldora -->
+          <div class="relative w-64 sm:w-80">
+            <input id="globalSearchInput" type="text" oninput="onGlobalSearch(this.value)"
+              placeholder="Buscar chofer, cédula o equipo..."
+              class="w-full rounded-full border border-slate-200 bg-white py-2 pl-4 pr-9 text-xs font-medium text-slate-700 placeholder-slate-400 shadow-sm transition focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/15" />
+            <svg class="pointer-events-none absolute right-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>
+            </svg>
+          </div>
+
+          <!-- Última Sincronización + Botón Refrescar -->
+          <div class="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3.5 py-1.5 text-xs shadow-sm">
+            <span class="h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span>
+            <span class="text-slate-400">Sinc:</span>
+            <strong id="lastSyncClock" class="font-mono text-slate-700">--:--:--</strong>
+          </div>
+
+          <button type="button" onclick="syncRealtimeData(true)"
+            class="inline-flex items-center gap-2 rounded-full bg-blue-600 px-4 py-2 text-xs font-bold text-white shadow-md shadow-blue-600/20 transition hover:bg-blue-700 active:scale-95">
+            <svg id="headerSyncIcon" class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3">
+              <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/>
+            </svg>
+            <span>Actualizar</span>
+          </button>
+        </div>
+      </header>
+
+      <!-- Alerta Global si hay error de conexión -->
+      <div id="globalAlertBar" class="mx-6 mt-4 hidden items-center justify-between rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 text-xs font-semibold text-amber-800">
+        <span id="globalAlertText"></span>
+        <button type="button" onclick="syncRealtimeData(true)" class="rounded-lg bg-amber-200/70 px-3 py-1 text-amber-900 hover:bg-amber-300">Reintentar</button>
+      </div>
+
+      <!-- CONTENEDOR DE VISTAS -->
+      <main class="flex-1 p-6 space-y-6">
+
+        <!-- ===================================================================== -->
+        <!-- VISTA 1: PANEL PRINCIPAL · JORNADAS ABIERTAS                          -->
+        <!-- ===================================================================== -->
+        <div id="module_ABIERTAS" class="space-y-6">
+
+          <!-- Tira Superior de 3 KPIs -->
+          <div class="saas-card p-6">
+            <div class="grid grid-cols-1 gap-6 sm:grid-cols-3 sm:divide-x sm:divide-slate-100">
+              <div class="px-2">
+                <p class="text-xs font-semibold text-slate-400">Jornadas Abiertas Ahora</p>
+                <div class="mt-1 flex items-baseline gap-2">
+                  <span id="kpiOpenCount" class="text-4xl font-extrabold tracking-tight text-slate-900">0</span>
+                  <span class="text-xs font-bold text-emerald-600">en curso</span>
+                </div>
+                <p class="mt-1 text-[11px] font-medium text-slate-400">Activas en tiempo real</p>
+              </div>
+
+              <div class="px-2 sm:pl-6">
+                <p class="text-xs font-semibold text-slate-400">Tiempo Promedio Actual</p>
+                <div class="mt-1 flex items-baseline gap-2">
+                  <span id="kpiOpenAvgTime" class="font-mono text-3xl font-extrabold tracking-tight text-slate-900">00h 00m</span>
+                </div>
+                <p id="kpiOpenMaxTime" class="mt-1 text-[11px] font-semibold text-blue-600">Máx: 00h 00m</p>
+              </div>
+
+              <div class="px-2 sm:pl-6">
+                <p class="text-xs font-semibold text-blue-600">Ubicación Inicio (Geocercas)</p>
+                <div class="mt-1 flex items-baseline gap-3">
+                  <span id="kpiOpenAnomalies" class="text-4xl font-extrabold tracking-tight text-slate-900">0</span>
+                  <span class="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-extrabold text-amber-700">? Fuera de Zona</span>
+                </div>
+                <div class="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
+                  <div id="kpiGeofenceBar" class="h-full bg-gradient-to-r from-blue-600 to-emerald-500 transition-all duration-500" style="width: 100%"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tabla Minimalista de Jornadas Abiertas -->
+          <div class="saas-card overflow-hidden">
+            <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-6 py-4">
+              <div class="flex items-center gap-3">
+                <span class="h-2.5 w-2.5 rounded-full bg-blue-600"></span>
+                <h3 class="text-sm font-extrabold text-slate-800">Choferes con Jornada Abierta Actualmente</h3>
+                <span id="openTableBadge" class="rounded-full bg-blue-50 px-3 py-0.5 font-mono text-xs font-bold text-blue-600">0 activos</span>
+              </div>
+              <div class="flex flex-wrap items-center gap-3 text-xs text-slate-500">
+                <span class="inline-flex items-center gap-1.5 rounded-full border border-amber-300 bg-amber-50 px-2.5 py-0.5 font-bold text-amber-800">
+                  <span class="h-2 w-2 rounded-full bg-amber-500"></span> &ge; 11 hs Amarillo
+                </span>
+                <span class="inline-flex items-center gap-1.5 rounded-full border border-rose-300 bg-rose-50 px-2.5 py-0.5 font-bold text-rose-800">
+                  <span class="h-2 w-2 rounded-full bg-rose-600"></span> &ge; 12 hs Rojo
+                </span>
+                <span>• Indicador <strong class="text-amber-600">?</strong> = Fuera de geocercas</span>
+              </div>
+            </div>
+
+            <div class="overflow-x-auto">
+              <table class="w-full border-collapse text-left">
+                <thead>
+                  <tr class="border-b border-slate-100 bg-slate-50/70 text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                    <th class="py-3.5 pl-6 pr-3">Chofer (Motorista)</th>
+                    <th class="px-4 py-3.5">Equipo</th>
+                    <th class="px-4 py-3.5">Horario de Inicio de Jornada</th>
+                    <th class="px-4 py-3.5">Tiempo Total de Jornada Actualmente</th>
+                    <th class="px-4 py-3.5 text-center">Geocerca Inicio</th>
+                    <th class="py-3.5 pl-3 pr-6 text-right">Ubicación GPS</th>
+                  </tr>
+                </thead>
+                <tbody id="openShiftsTbody" class="divide-y divide-slate-100 text-xs">
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- ===================================================================== -->
+        <!-- VISTA 2: PANEL DE INTERJORNADA (CHOFERES SIN JORNADA ACTIVA · 12 HS)   -->
+        <!-- ===================================================================== -->
+        <div id="module_INTERJORNADA" class="hidden space-y-6">
+
+          <!-- Resumen Superior Interjornada -->
+          <div class="saas-card p-6">
+            <div class="grid grid-cols-1 gap-6 sm:grid-cols-3 lg:divide-x lg:divide-slate-100">
+              <div class="px-2">
+                <p class="text-xs font-semibold text-slate-400">Choferes Sin Jornada Activa</p>
+                <div class="mt-1 flex items-baseline gap-2">
+                  <span id="interTotalCount" class="text-4xl font-extrabold text-slate-900">0</span>
+                  <span class="text-xs font-semibold text-slate-400">motoristas en descanso</span>
+                </div>
+              </div>
+
+              <div class="px-2 lg:pl-6 cursor-pointer" onclick="setInterFilter('VERDE')">
+                <p class="text-xs font-bold uppercase tracking-wider text-emerald-600">Habilitados (&ge; 12 Horas)</p>
+                <div class="mt-1 flex items-baseline gap-2">
+                  <span id="interGreenCount" class="text-4xl font-extrabold text-emerald-600">0</span>
+                  <span class="rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-bold text-emerald-700">&ge; 12 hs cumplidas</span>
+                </div>
+              </div>
+
+              <div class="px-2 lg:pl-6 cursor-pointer" onclick="setInterFilter('ROJO')">
+                <p class="text-xs font-bold uppercase tracking-wider text-rose-600">En Interjornada (&lt; 12 Horas)</p>
+                <div class="mt-1 flex items-baseline gap-2">
+                  <span id="interRedCount" class="text-4xl font-extrabold text-rose-600">0</span>
+                  <span class="rounded-full bg-rose-50 px-2.5 py-0.5 text-xs font-bold text-rose-700">&lt; 12 hs desde último fin</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tabla de Interjornada -->
+          <div class="saas-card overflow-hidden">
+            <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-6 py-4">
+              <div class="flex items-center gap-2.5">
+                <h3 class="text-sm font-extrabold text-slate-800">Control de Horas de Descanso (Desde Último Fin de Jornada hasta Ahora)</h3>
+              </div>
+
+              <div class="flex flex-wrap items-center gap-2">
+                <div class="inline-flex rounded-xl bg-slate-100 p-1">
+                  <button type="button" onclick="setInterFilter('TODOS')" id="interBtn_TODOS"
+                    class="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-bold text-white shadow-sm">Todos</button>
+                  <button type="button" onclick="setInterFilter('ROJO')" id="interBtn_ROJO"
+                    class="rounded-lg px-3 py-1.5 text-xs font-bold text-slate-600 hover:text-rose-600">&lt; 12 hs (Rojo)</button>
+                  <button type="button" onclick="setInterFilter('VERDE')" id="interBtn_VERDE"
+                    class="rounded-lg px-3 py-1.5 text-xs font-bold text-slate-600 hover:text-emerald-600">&ge; 12 hs (Verde)</button>
+                </div>
+
+                <button type="button" onclick="exportInterjornadaExcel()"
+                  class="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-bold text-slate-700 shadow-sm hover:bg-slate-50">
+                  <span>Exportar Excel</span>
+                </button>
+              </div>
+            </div>
+
+            <div class="overflow-x-auto">
+              <table class="w-full border-collapse text-left">
+                <thead>
+                  <tr class="border-b border-slate-100 bg-slate-50/70 text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                    <th class="py-3.5 pl-6 pr-3">Chofer (Motorista)</th>
+                    <th class="px-4 py-3.5">Equipo</th>
+                    <th class="px-4 py-3.5">Último Inicio de Jornada</th>
+                    <th class="px-4 py-3.5">Último Fin de Jornada</th>
+                    <th class="px-4 py-3.5">Tiempo Transcurrido (Interjornada)</th>
+                    <th class="py-3.5 pl-3 pr-6 text-right">Estado 12 Horas</th>
+                  </tr>
+                </thead>
+                <tbody id="interjornadaTbody" class="divide-y divide-slate-100 text-xs">
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- ===================================================================== -->
+        <!-- VISTA 3: PANEL DE DÍAS TRABAJADOS (MATRIZ CHOFERES VS FECHAS P / DL)   -->
+        <!-- ===================================================================== -->
+        <div id="module_DIAS_TRABAJADOS" class="hidden space-y-6">
+
+          <!-- Selector de Rango para la Matriz -->
+          <div class="saas-card p-5 flex flex-wrap items-center justify-between gap-4">
+            <div class="flex flex-wrap items-center gap-3">
+              <span class="text-xs font-extrabold uppercase tracking-wider text-slate-400">Periodo de Matriz:</span>
+              <div class="inline-flex rounded-xl bg-slate-100 p-1">
+                <button type="button" onclick="setMatrixPreset(7)" class="rounded-lg px-3 py-1.5 text-xs font-bold text-slate-600 hover:bg-white">Últimos 7 días</button>
+                <button type="button" onclick="setMatrixPreset(15)" class="rounded-lg px-3 py-1.5 text-xs font-bold text-slate-600 hover:bg-white">Últimos 15 días</button>
+                <button type="button" onclick="setMatrixPreset('MES')" class="rounded-lg px-3 py-1.5 text-xs font-bold text-slate-600 hover:bg-white">Este Mes</button>
+              </div>
+
+              <div class="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs">
+                <span class="font-semibold text-slate-400">Desde</span>
+                <input id="matrixDateStart" type="date" class="bg-transparent font-mono font-bold text-slate-800 focus:outline-none" />
+                <span class="text-slate-300">—</span>
+                <span class="font-semibold text-slate-400">Hasta</span>
+                <input id="matrixDateEnd" type="date" class="bg-transparent font-mono font-bold text-slate-800 focus:outline-none" />
+              </div>
+
+              <button type="button" onclick="loadMatrixAndReportsRange()"
+                class="rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-blue-700">
+                Generar Matriz
+              </button>
+            </div>
+
+            <div class="flex flex-wrap items-center gap-3">
+              <div class="flex flex-wrap items-center gap-2 text-xs">
+                <span class="inline-flex h-6 w-7 items-center justify-center rounded-md bg-emerald-100 font-mono font-extrabold text-emerald-700">P</span>
+                <span class="font-semibold text-slate-500">= Presente (Tocar para ver Inicio/Fin y Total)</span>
+                <span class="inline-flex h-6 w-7 items-center justify-center rounded-md bg-slate-100 font-mono font-bold text-slate-400">DL</span>
+                <span class="font-semibold text-slate-500">= Día Libre (Tocar para ver Último Fin e Interjornada)</span>
+              </div>
+
+              <button type="button" onclick="exportMatrixExcel()"
+                class="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-emerald-700">
+                <span>Descargar Matriz Excel (.xlsx)</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Tabla Matriz P / DL -->
+          <div class="saas-card overflow-hidden">
+            <div class="overflow-x-auto">
+              <table class="w-full border-collapse text-left text-xs">
+                <thead id="matrixThead" class="border-b border-slate-200 bg-slate-50 text-[11px] font-bold uppercase text-slate-500">
+                </thead>
+                <tbody id="matrixTbody" class="divide-y divide-slate-100">
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- ===================================================================== -->
+        <!-- VISTA 3B: PANEL DE CONTROL DE TURNOS (MATRIZ M / TARDE / NOCHE / DL)  -->
+        <!-- ===================================================================== -->
+        <div id="module_TURNOS" class="hidden space-y-6">
+
+          <!-- Selector de Rango y Leyenda de Turnos -->
+          <div class="saas-card p-5 flex flex-wrap items-center justify-between gap-4">
+            <div class="flex flex-wrap items-center gap-3">
+              <span class="text-xs font-extrabold uppercase tracking-wider text-slate-400">Periodo de Turnos:</span>
+              <div class="inline-flex rounded-xl bg-slate-100 p-1">
+                <button type="button" onclick="setMatrixPreset(7)" class="rounded-lg px-3 py-1.5 text-xs font-bold text-slate-600 hover:bg-white">Últimos 7 días</button>
+                <button type="button" onclick="setMatrixPreset(15)" class="rounded-lg px-3 py-1.5 text-xs font-bold text-slate-600 hover:bg-white">Últimos 15 días</button>
+                <button type="button" onclick="setMatrixPreset('MES')" class="rounded-lg px-3 py-1.5 text-xs font-bold text-slate-600 hover:bg-white">Este Mes</button>
+              </div>
+
+              <div class="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs">
+                <span class="font-semibold text-slate-400">Desde</span>
+                <input id="turnosDateStart" type="date" onchange="syncTurnosDatesAndLoad()" class="bg-transparent font-mono font-bold text-slate-800 focus:outline-none" />
+                <span class="text-slate-300">—</span>
+                <span class="font-semibold text-slate-400">Hasta</span>
+                <input id="turnosDateEnd" type="date" onchange="syncTurnosDatesAndLoad()" class="bg-transparent font-mono font-bold text-slate-800 focus:outline-none" />
+              </div>
+
+              <button type="button" onclick="syncTurnosDatesAndLoad()"
+                class="rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-blue-700">
+                Actualizar Turnos
+              </button>
+            </div>
+
+            <div class="flex flex-wrap items-center gap-3">
+              <div class="flex flex-wrap items-center gap-2 text-xs">
+                <span class="inline-flex items-center justify-center rounded-md bg-sky-100 px-2.5 py-1 font-mono text-[11px] font-extrabold text-sky-800 border border-sky-200">MAÑANA</span>
+                <span class="font-semibold text-slate-500">03:00 a 09:59 hs</span>
+                <span class="inline-flex items-center justify-center rounded-md bg-amber-100 px-2.5 py-1 font-mono text-[11px] font-extrabold text-amber-800 border border-amber-200">TARDE</span>
+                <span class="font-semibold text-slate-500">10:00 a 17:59 hs</span>
+                <span class="inline-flex items-center justify-center rounded-md bg-indigo-100 px-2.5 py-1 font-mono text-[11px] font-extrabold text-indigo-800 border border-indigo-200">NOCHE</span>
+                <span class="font-semibold text-slate-500">18:00 a 02:59 hs</span>
+              </div>
+
+              <button type="button" onclick="exportTurnosExcel()"
+                class="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-emerald-700">
+                <span>Descargar Turnos Excel (.xlsx)</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Tabla Matriz de Control de Turnos -->
+          <div class="saas-card overflow-hidden">
+            <div class="overflow-x-auto">
+              <table class="w-full border-collapse text-left text-xs">
+                <thead id="turnosThead" class="border-b border-slate-200 bg-slate-50 text-[11px] font-bold uppercase text-slate-500">
+                </thead>
+                <tbody id="turnosTbody" class="divide-y divide-slate-100">
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- ===================================================================== -->
+        <!-- VISTA 3C: APARTADO DE USUARIOS (CHOFERES · VERIFICACIÓN Y GESTIÓN)    -->
+        <!-- ===================================================================== -->
+        <div id="module_USUARIOS" class="hidden space-y-6">
+
+          <!-- Tarjeta de Verificación de Permisos Prolog + KPIs de Usuarios -->
+          <div class="saas-card p-6 space-y-4">
+            <div class="flex flex-wrap items-center justify-between gap-4 border-b border-slate-100 pb-4">
+              <div>
+                <div class="flex items-center gap-2">
+                  <span class="inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500"></span>
+                  <h3 class="text-sm font-extrabold text-slate-900">Gestión de Usuarios (Motoristas) &amp; Estado de Permisos Prolog</h3>
+                </div>
+                <p class="mt-1 text-xs text-slate-500">
+                  Cuenta Prolog activa: <strong class="font-mono text-slate-800">00007097243 (MIGUEL PATIÑO CABRAL)</strong> · Rol: <strong class="text-blue-600">ACESSO FILIAL - TST/RH (ID 4634)</strong>
+                </p>
+              </div>
+
+              <div class="flex flex-wrap items-center gap-2.5">
+                <button type="button" onclick="exportUsuariosExcel()"
+                  class="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-bold text-slate-700 shadow-sm hover:bg-slate-50">
+                  <span>Exportar Choferes (.xlsx)</span>
+                </button>
+                <button type="button" onclick="openDriverModal()"
+                  class="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-xs font-bold text-white shadow-md shadow-blue-600/20 transition hover:bg-blue-700">
+                  <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+                  <span>Agregar Nuevo Chofer</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Resultado de Verificación de Permisos en Prolog API -->
+            <div class="grid grid-cols-1 gap-4 lg:grid-cols-3">
+              <div class="saas-subcard p-4 flex items-start gap-3">
+                <span class="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700 font-bold text-xs">✓</span>
+                <div>
+                  <p class="text-xs font-extrabold text-slate-800">Visualizar Choferes (Permiso 316)</p>
+                  <p class="mt-0.5 text-[11px] text-slate-500">Habilitado en Prolog (<code class="font-mono text-emerald-700">Colaboradores.VISUALIZAR = 316</code>). Sincroniza en vivo los <strong id="usrCountTotalBadge">80</strong> motoristas activos de CER_YPE.</p>
+                </div>
+              </div>
+
+              <div class="saas-subcard p-4 flex items-start gap-3">
+                <span class="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-700 font-bold text-xs">!</span>
+                <div>
+                  <p class="text-xs font-extrabold text-slate-800">Permisos en Servidor Prolog (310 / 325)</p>
+                  <p class="mt-0.5 text-[11px] text-slate-500">El rol <strong class="text-slate-700">ACESSO FILIAL - TST/RH</strong> no incluye <code class="font-mono">CADASTRAR (310)</code> ni <code class="font-mono">ALTERAR (325)</code> directamente en la base matriz de Prolog.</p>
+                </div>
+              </div>
+
+              <div class="saas-subcard p-4 flex items-start gap-3 border-blue-200 bg-blue-50/40">
+                <span class="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-white font-bold text-xs">★</span>
+                <div>
+                  <p class="text-xs font-extrabold text-blue-900">Edición y Alta Local Habilitada</p>
+                  <p class="mt-0.5 text-[11px] text-blue-800/80">Puedes <strong>editar cualquier chofer</strong> o <strong>agregar nuevos motoristas</strong> aquí. Se guardan localmente en el puente y se integran en todos los paneles.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tabla de Usuarios (Choferes) -->
+          <div class="saas-card overflow-hidden">
+            <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-6 py-4">
+              <div class="flex items-center gap-3">
+                <h3 class="text-sm font-extrabold text-slate-800">Directorio de Usuarios · Función: MOTORISTA</h3>
+                <span id="usuariosTableCount" class="rounded-full bg-blue-50 px-3 py-0.5 font-mono text-xs font-bold text-blue-600">80 choferes</span>
+              </div>
+            </div>
+
+            <div class="overflow-x-auto">
+              <table class="w-full border-collapse text-left text-xs">
+                <thead>
+                  <tr class="border-b border-slate-100 bg-slate-50/70 text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                    <th class="py-3.5 pl-6 pr-3">Nombre del Chofer</th>
+                    <th class="px-4 py-3.5">CPF / Usuario Prolog</th>
+                    <th class="px-4 py-3.5">Matrícula Ambev</th>
+                    <th class="px-4 py-3.5">Función</th>
+                    <th class="px-4 py-3.5">Equipo / Unidad</th>
+                    <th class="px-4 py-3.5 text-center">Estado Actual</th>
+                    <th class="py-3.5 pl-3 pr-6 text-right">Acciones</th>
+                  </tr>
+                </thead>
+                <tbody id="usuariosTbody" class="divide-y divide-slate-100">
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- ===================================================================== -->
+        <!-- VISTA 4: APARTADO DE RELATORIOS (MACROS Y ANOMALÍAS FUERA DE GEOCERCA) -->
+        <!-- ===================================================================== -->
+        <div id="module_RELATORIOS" class="hidden space-y-6">
+
+          <!-- Filtros de Relatorios -->
+          <div class="saas-card p-6 space-y-4">
+            <div class="flex flex-wrap items-center justify-between gap-4 border-b border-slate-100 pb-4">
+              <div class="inline-flex rounded-2xl bg-slate-100 p-1">
+                <button type="button" id="relSubBtn_MACROS" onclick="switchReportSubTab('MACROS')"
+                  class="rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white shadow-sm">
+                  1. Relatorio de Macros (Por Fecha y Chofer)
+                </button>
+                <button type="button" id="relSubBtn_ANOMALIAS" onclick="switchReportSubTab('ANOMALIAS')"
+                  class="rounded-xl px-4 py-2 text-xs font-bold text-slate-600 hover:text-slate-900">
+                  2. Relatorio de Anomalías (? Fuera de Geocerca)
+                </button>
+              </div>
+
+              <div class="flex flex-wrap items-center gap-2">
+                <button type="button" onclick="verifyPeriodGpsCoordinates()" id="btnVerifyGpsBatch"
+                  class="inline-flex items-center gap-2 rounded-xl border border-amber-300 bg-amber-50 px-3.5 py-2 text-xs font-bold text-amber-800 hover:bg-amber-100">
+                  <span>📍 Verificar GPS de Geocercas del Periodo</span>
+                </button>
+                <button type="button" onclick="exportReportExcel()"
+                  class="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-emerald-700">
+                  <span>Descargar Excel (.xlsx)</span>
+                </button>
+                <button type="button" onclick="exportReportCsv()"
+                  class="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50">
+                  <span>CSV</span>
+                </button>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5 items-end">
+              <div>
+                <label class="mb-1 block text-[11px] font-bold uppercase text-slate-400">Fecha Desde</label>
+                <input id="repDateStart" type="date" class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 font-mono text-xs font-bold text-slate-800" />
+              </div>
+              <div>
+                <label class="mb-1 block text-[11px] font-bold uppercase text-slate-400">Fecha Hasta</label>
+                <input id="repDateEnd" type="date" class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 font-mono text-xs font-bold text-slate-800" />
+              </div>
+              <div>
+                <label class="mb-1 block text-[11px] font-bold uppercase text-slate-400">Chofer (Motorista)</label>
+                <select id="repDriverSelect" onchange="renderRelatoriosView()" class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-800">
+                  <option value="TODOS">Todos los Motoristas (80)</option>
+                </select>
+              </div>
+              <div>
+                <label class="mb-1 block text-[11px] font-bold uppercase text-slate-400">Macro / Tipo Marcación</label>
+                <select id="repMacroSelect" onchange="onChangeReportMacro()" class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-bold text-slate-800">
+                  <option value="444">444 · INICIO Y FIN DE JORNADA</option>
+                  <option value="TODOS">Todas las Macros</option>
+                  <option value="449">449 · INICIO DE VIAJE</option>
+                  <option value="450">450 · LLEGADA A FABRICA</option>
+                  <option value="445">445 · CONSUMISION</option>
+                  <option value="448">448 · CAMBIO DE CONDUCTOR</option>
+                </select>
+              </div>
+              <div>
+                <button type="button" onclick="loadCustomReportMarks()"
+                  class="w-full rounded-xl bg-blue-600 px-4 py-2.5 text-xs font-bold text-white shadow-md shadow-blue-600/20 hover:bg-blue-700">
+                  Consultar Periodo
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tabla de Resultados de Relatorio -->
+          <div class="saas-card overflow-hidden">
+            <div class="flex items-center justify-between border-b border-slate-100 px-6 py-4">
+              <div class="flex items-center gap-2.5">
+                <h3 id="repTableTitle" class="text-sm font-extrabold text-slate-800">Listado de Macros Registradas</h3>
+                <span id="repTableCountBadge" class="rounded-full bg-blue-50 px-3 py-0.5 font-mono text-xs font-bold text-blue-600">0 registros</span>
+              </div>
+              <span id="gpsBatchStatusText" class="text-xs font-semibold text-slate-400"></span>
+            </div>
+
+            <div class="overflow-x-auto">
+              <table class="w-full border-collapse text-left text-xs">
+                <thead>
+                  <tr class="border-b border-slate-100 bg-slate-50/70 text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                    <th class="py-3.5 pl-6 pr-3">Chofer (Motorista)</th>
+                    <th class="px-4 py-3.5">Macro</th>
+                    <th class="px-4 py-3.5">Inicio</th>
+                    <th class="px-4 py-3.5">Fin</th>
+                    <th class="px-4 py-3.5">Duración</th>
+                    <th class="px-4 py-3.5 text-center">Geocerca (Inicio / Fin)</th>
+                    <th class="py-3.5 pl-3 pr-6 text-right">Mapa Directo</th>
+                  </tr>
+                </thead>
+                <tbody id="repTableTbody" class="divide-y divide-slate-100">
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- ===================================================================== -->
+        <!-- VISTA 5: AJUSTES · CREADOR DE GEOCERCAS POLIGONALES                    -->
+        <!-- ===================================================================== -->
+        <div id="module_GEOCERCAS" class="hidden space-y-6">
+          <div class="grid grid-cols-1 gap-6 lg:grid-cols-12">
+
+            <!-- Mapa Interactivo Creador de Polígonos (8 columnas) -->
+            <div class="saas-card p-5 lg:col-span-8 flex flex-col space-y-4">
+              <div class="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <h3 class="text-sm font-extrabold text-slate-900">Mapa de Geocercas Poligonales</h3>
+                  <p class="text-xs text-slate-500">Haz clic sobre el mapa para marcar los vértices del polígono. Evalúa exclusivamente la macro <strong>INICIO Y FIN DE JORNADA</strong>.</p>
+                </div>
+                <div class="flex items-center gap-2">
+                  <button type="button" onclick="toggleGeofenceMapLayer()" class="rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-100">
+                    🛰️ Vista Satélite / Mapa
+                  </button>
+                  <button type="button" onclick="undoLastPolygonPoint()" class="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-50">
+                    Deshacer Punto
+                  </button>
+                  <button type="button" onclick="clearDraftPolygon()" class="rounded-xl border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-bold text-rose-600 hover:bg-rose-100">
+                    Limpiar Trazo
+                  </button>
+                </div>
+              </div>
+
+              <div id="geofenceEditorMap" class="h-[520px] w-full rounded-2xl border border-slate-200 z-10"></div>
+            </div>
+
+            <!-- Panel Derecho: Guardar Polígono y Lista de Geocercas Activas (4 columnas) -->
+            <div class="space-y-6 lg:col-span-4">
+              <!-- Formulario Nueva Geocerca -->
+              <div class="saas-card p-6 space-y-4">
+                <h3 class="text-sm font-extrabold text-slate-900">Nueva Geocerca Poligonal</h3>
+                <div>
+                  <label class="mb-1 block text-xs font-bold text-slate-500">Nombre de la Zona / Planta</label>
+                  <input id="newGeoName" type="text" placeholder="Ej: Planta Cervepar Ypané (CER_YPE)"
+                    class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-xs font-semibold text-slate-900 focus:border-blue-600 focus:bg-white focus:outline-none" />
+                </div>
+
+                <div class="flex items-center justify-between gap-3">
+                  <div class="flex-1">
+                    <label class="mb-1 block text-xs font-bold text-slate-500">Color del Polígono</label>
+                    <input id="newGeoColor" type="color" value="#2563eb" class="h-9 w-full cursor-pointer rounded-xl border border-slate-200 bg-white p-1" />
+                  </div>
+                  <div class="flex-1">
+                    <label class="mb-1 block text-xs font-bold text-slate-500">Puntos trazados</label>
+                    <div id="draftPointsCount" class="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 font-mono text-xs font-bold text-blue-600">0 vértices</div>
+                  </div>
+                </div>
+
+                <button type="button" onclick="saveNewGeofencePolygon()"
+                  class="w-full rounded-xl bg-blue-600 px-4 py-3 text-xs font-bold text-white shadow-md shadow-blue-600/20 transition hover:bg-blue-700">
+                  Guardar Geocerca Poligonal
+                </button>
+              </div>
+
+              <!-- Lista de Geocercas Creadas -->
+              <div class="saas-card p-6 space-y-4">
+                <div class="flex items-center justify-between">
+                  <h3 class="text-sm font-extrabold text-slate-900">Geocercas Configuradas</h3>
+                  <span id="savedGeoCountBadge" class="rounded-full bg-blue-50 px-2.5 py-0.5 font-mono text-xs font-bold text-blue-600">0</span>
+                </div>
+                <p class="text-[11px] text-slate-400">
+                  Si un motorista marca <strong>Inicio o Fin de Jornada</strong> fuera de todas las geocercas activas, aparecerá con <strong class="text-amber-600">?</strong>.
+                </p>
+                <div id="savedGeofencesList" class="space-y-2.5 max-h-[280px] overflow-y-auto pr-1">
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+      </main>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- MODAL DE MAPA GPS DIRECTO MINIMALISTA (VER UBICACIÓN DE MARCACIÓN)        -->
+  <!-- ========================================================================= -->
+  <div id="gpsMapModal" onclick="closeGpsMapModal()"
+    class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm">
+    <div onclick="event.stopPropagation()" class="saas-card w-full max-w-3xl overflow-hidden shadow-2xl">
+      <div class="flex items-center justify-between border-b border-slate-100 px-6 py-4">
+        <div>
+          <h3 id="gpsModalTitle" class="text-base font-extrabold text-slate-900">Ubicación GPS de Marcación</h3>
+          <p id="gpsModalSubtitle" class="text-xs font-medium text-slate-500">--</p>
+        </div>
+        <div class="flex items-center gap-2">
+          <a id="gpsExternalLink" href="#" target="_blank" rel="noopener"
+            class="rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-bold text-blue-600 hover:bg-blue-50">
+            Abrir en Google Maps ↗
+          </a>
+          <button type="button" onclick="closeGpsMapModal()" class="rounded-xl bg-slate-100 p-2 text-slate-500 hover:bg-slate-200">
+            <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="p-5 space-y-4">
+        <div id="gpsModalInfoStrip" class="grid grid-cols-1 gap-3 sm:grid-cols-3"></div>
+        <div id="directMarkingMap" class="h-[400px] w-full rounded-2xl border border-slate-200 z-10"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- MODAL INTERACTIVO DE CELDA (DETALLE DE P / DL / TURNO M-TARDE-NOCHE)      -->
+  <!-- ========================================================================= -->
+  <div id="cellDetailModal" onclick="closeCellDetailModal()"
+    class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm">
+    <div onclick="event.stopPropagation()" class="saas-card w-full max-w-lg overflow-hidden shadow-2xl">
+      <div class="flex items-center justify-between border-b border-slate-100 px-6 py-4">
+        <div>
+          <span id="cellModalTypeBadge" class="inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-extrabold uppercase"></span>
+          <h3 id="cellModalDriverName" class="mt-1 text-base font-extrabold text-slate-900">--</h3>
+          <p id="cellModalDateSubtitle" class="text-xs font-medium text-slate-500">--</p>
+        </div>
+        <button type="button" onclick="closeCellDetailModal()" class="rounded-xl bg-slate-100 p-2 text-slate-500 hover:bg-slate-200">
+          <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+        </button>
+      </div>
+      <div id="cellModalBody" class="p-6 space-y-4"></div>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- MODAL DE AGREGAR / EDITAR CHOFER (APARTADO DE USUARIOS)                   -->
+  <!-- ========================================================================= -->
+  <div id="driverEditModal" onclick="closeDriverModal()"
+    class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm">
+    <div onclick="event.stopPropagation()" class="saas-card w-full max-w-md overflow-hidden shadow-2xl">
+      <div class="flex items-center justify-between border-b border-slate-100 px-6 py-4">
+        <div>
+          <h3 id="driverModalTitle" class="text-base font-extrabold text-slate-900">Agregar Nuevo Chofer</h3>
+          <p class="text-xs font-medium text-slate-500">Unidad 617 · CER_YPE (Función: MOTORISTA)</p>
+        </div>
+        <button type="button" onclick="closeDriverModal()" class="rounded-xl bg-slate-100 p-2 text-slate-500 hover:bg-slate-200">
+          <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+        </button>
+      </div>
+      <form onsubmit="handleSaveDriverSubmit(event)" class="p-6 space-y-4">
+        <input id="drvFormOriginalCpf" type="hidden" value="" />
+        <div>
+          <label class="mb-1 block text-xs font-bold uppercase text-slate-500">Nombre Completo del Chofer</label>
+          <input id="drvFormNome" type="text" required placeholder="Ej: JUAN CARLOS PEREZ"
+            class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-xs font-bold uppercase text-slate-900 focus:border-blue-600 focus:bg-white focus:outline-none" />
+        </div>
+        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div>
+            <label class="mb-1 block text-xs font-bold uppercase text-slate-500">CPF / Cédula (Usuario)</label>
+            <input id="drvFormCpf" type="text" required placeholder="00004567890"
+              class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 font-mono text-xs font-bold text-slate-900 focus:border-blue-600 focus:bg-white focus:outline-none" />
+          </div>
+          <div>
+            <label class="mb-1 block text-xs font-bold uppercase text-slate-500">Matrícula Ambev / ID</label>
+            <input id="drvFormMatricula" type="text" placeholder="Ej: 4567890"
+              class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 font-mono text-xs font-bold text-slate-900 focus:border-blue-600 focus:bg-white focus:outline-none" />
+          </div>
+        </div>
+        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div>
+            <label class="mb-1 block text-xs font-bold uppercase text-slate-500">Equipo</label>
+            <input id="drvFormEquipe" type="text" required value="CER_YPE"
+              class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-xs font-bold uppercase text-slate-900 focus:border-blue-600 focus:bg-white focus:outline-none" />
+          </div>
+          <div>
+            <label class="mb-1 block text-xs font-bold uppercase text-slate-500">Función</label>
+            <input id="drvFormFuncao" type="text" readonly value="MOTORISTA"
+              class="w-full rounded-xl border border-slate-200 bg-slate-100 px-3.5 py-2.5 text-xs font-bold text-slate-600" />
+          </div>
+        </div>
+        <div class="flex items-center justify-end gap-2 pt-2">
+          <button type="button" onclick="closeDriverModal()" class="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-50">
+            Cancelar
+          </button>
+          <button type="submit" class="rounded-xl bg-blue-600 px-5 py-2.5 text-xs font-bold text-white shadow-md shadow-blue-600/20 hover:bg-blue-700">
+            Guardar Chofer
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- LÓGICA DE APLICACIÓN PROLOG CONTROL DE JORNADA                            -->
+  <!-- ========================================================================= -->
+  <script>
+    const API_BASE = 'http://localhost:3005';
+    const PROLOG_REMOTE_BASE = 'https://prologapp.com/prolog';
+
+    const PrologService = {
+      jwt: localStorage.getItem('prolog_cloud_jwt') || '',
+      cargosList: null,
+      cachedColabs: null,
+      userProfile: null,
+
+      async isBridgeAvailable() {
+        if (location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') return false;
+        try {
+          const ctrl = new AbortController();
+          const tid = setTimeout(() => ctrl.abort(), 1000);
+          const res = await fetch(`${API_BASE}/api/prolog/custom-drivers`, { signal: ctrl.signal });
+          clearTimeout(tid);
+          return res.ok;
+        } catch (e) {
+          return false;
+        }
+      },
+
+      async login(user, pass, codUnidade = 617) {
+        if (await this.isBridgeAvailable()) {
+          const res = await fetch(`${API_BASE}/api/prolog/login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ usuario: user, senha: pass, codUnidade })
+          });
+          const data = await res.json();
+          if (!res.ok || !data.ok) throw new Error(data.error || 'Credenciales inválidas en Prolog');
+          return data;
+        }
+
+        // Modo Nube Directo
+        const res = await fetch(`${PROLOG_REMOTE_BASE}/api/v3/auth`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ user, pass, loginByToken: false })
+        });
+        const data = await res.json();
+        if (!res.ok || !data.token) {
+          throw new Error(data.message || 'Credenciales incorrectas en Prolog');
+        }
+        this.jwt = data.token;
+        localStorage.setItem('prolog_cloud_jwt', this.jwt);
+
+        try {
+          const selfRes = await fetch(`${PROLOG_REMOTE_BASE}/api/v3/users/self`, {
+            headers: { 'Authorization': `Bearer ${this.jwt}` }
+          });
+          if (selfRes.ok) {
+            this.userProfile = await selfRes.json();
+          }
+        } catch (e) {}
+
+        return { ok: true, token: this.jwt, user: this.userProfile || { name: user } };
+      },
+
+      async ensureCloudToken(user, pass) {
+        if (!this.jwt && user && pass) {
+          await this.login(user, pass);
+        }
+      },
+
+      async sync(params) {
+        const { usuario, senha, codUnidade, datainicio, datafim, codTipoIntervalo, force } = params;
+
+        if (await this.isBridgeAvailable()) {
+          const res = await fetch(`${API_BASE}/api/prolog/sync`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(params)
+          });
+          return await res.json();
+        }
+
+        // Modo Nube Directo
+        await this.ensureCloudToken(usuario, senha);
+        const headers = {
+          'Authorization': `Bearer ${this.jwt}`,
+          'Accept': 'application/json'
+        };
+
+        if (!this.cargosList || !this.cachedColabs || force) {
+          const [colabsRes, cargosRes] = await Promise.all([
+            fetch(`${PROLOG_REMOTE_BASE}/v2/colaboradores/listagem?codUnidades=${codUnidade}&apenasAtivos=true`, { headers }),
+            fetch(`${PROLOG_REMOTE_BASE}/v2/cargos/todos/por-unidade?codUnidades=${codUnidade}`, { headers })
+          ]);
+          this.cachedColabs = colabsRes.ok ? await colabsRes.json() : [];
+          this.cargosList = cargosRes.ok ? await cargosRes.json() : [];
+        }
+
+        const cargoQuery = (this.cargosList || []).map(c => `codCargos=${c.codigo}`).join('&');
+
+        const epMarc = `${PROLOG_REMOTE_BASE}/v2/controle-jornada/marcacoes-por-data?codUnidade=${codUnidade}&dataInicial=${datainicio}&dataFinal=${datafim}${codTipoIntervalo && codTipoIntervalo !== 'TODOS' ? `&codTipoIntervalo=${codTipoIntervalo}` : ''}`;
+        const epViag = `${PROLOG_REMOTE_BASE}/v2/controle-jornada/acompanhamento-viagens/viagens-em-andamento?codUnidades=${codUnidade}&${cargoQuery}`;
+        const epDesc = `${PROLOG_REMOTE_BASE}/v2/controle-jornada/acompanhamento-viagens/colaboradores-em-descanso?codUnidades=${codUnidade}&${cargoQuery}`;
+
+        const [marcRes, viagRes, descRes] = await Promise.all([
+          fetch(epMarc, { headers }),
+          fetch(epViag, { headers }),
+          fetch(epDesc, { headers })
+        ]);
+
+        const rawMarc = marcRes.ok ? await marcRes.json() : [];
+        const rawViag = viagRes.ok ? await viagRes.json() : {};
+        const rawDesc = descRes.ok ? await descRes.json() : {};
+
+        let motoristas = (this.cachedColabs || []).filter(c => String(c.nomeFuncao || '').toUpperCase().includes('MOTORISTA'));
+        
+        const localCustom = localStorage.getItem('prolog_custom_drivers_v1');
+        if (localCustom) {
+          try {
+            const customArr = JSON.parse(localCustom);
+            const byCpf = {};
+            motoristas.forEach(m => { byCpf[cleanCpfStr(m.cpf)] = m; });
+            customArr.forEach(cm => {
+              const k = cleanCpfStr(cm.cpf);
+              if (cm.deleted) {
+                delete byCpf[k];
+              } else if (byCpf[k]) {
+                Object.assign(byCpf[k], cm, { editadoLocal: true });
+              } else {
+                byCpf[k] = Object.assign({}, cm, { creadoLocal: true });
+              }
+            });
+            motoristas = Object.values(byCpf);
+          } catch (e) {}
+        }
+
+        const motoristaCpfs = new Set(motoristas.map(m => cleanCpfStr(m.cpf)));
+        const motoristaNames = new Set(motoristas.map(m => String(m.nome).trim().toUpperCase()));
+
+        const filteredMarc = (Array.isArray(rawMarc) ? rawMarc : []).filter(m => {
+          const cpf = cleanCpfStr(m.cpfColaborador);
+          const nom = String(m.nomeColaborador || '').trim().toUpperCase();
+          return (cpf && motoristaCpfs.has(cpf)) || (nom && motoristaNames.has(nom));
+        });
+
+        const filteredViag = (rawViag.colaboradoresEmViagem || []).filter(v => {
+          const cpf = cleanCpfStr(v.cpfColaborador);
+          const nom = String(v.nomeColaborador || '').trim().toUpperCase();
+          return (cpf && motoristaCpfs.has(cpf)) || (nom && motoristaNames.has(nom));
+        });
+
+        const filteredDesc = (rawDesc.colaboradoresEmDescanso || []).filter(d => {
+          const cpf = cleanCpfStr(d.cpfColaborador);
+          const nom = String(d.nomeColaborador || '').trim().toUpperCase();
+          return (cpf && motoristaCpfs.has(cpf)) || (nom && motoristaNames.has(nom));
+        });
+
+        return {
+          ok: true,
+          colaboradores: motoristas,
+          marcacoes: filteredMarc,
+          viagensEmAndamento: filteredViag,
+          colaboradoresEmDescanso: filteredDesc,
+          user: this.userProfile || { name: usuario }
+        };
+      },
+
+      async fetchGpsDetail(codUnidade, codIni, codFim) {
+        if (await this.isBridgeAvailable()) {
+          const res = await fetch(`${API_BASE}/api/prolog/detail`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              usuario: state.credentials.usuario,
+              senha: state.credentials.senha,
+              codUnidade,
+              codInicio: codIni,
+              codFim
+            })
+          });
+          return await res.json();
+        }
+
+        await this.ensureCloudToken(state.credentials.usuario, state.credentials.senha);
+        const qs = [`codUnidade=${codUnidade}`];
+        if (codIni > 0) qs.push(`codInicio=${codIni}`);
+        if (codFim > 0) qs.push(`codFim=${codFim}`);
+        const res = await fetch(`${PROLOG_REMOTE_BASE}/v2/controle-jornada/acompanhamento-viagens/marcacao-inicio-fim?${qs.join('&')}`, {
+          headers: { 'Authorization': `Bearer ${this.jwt}` }
+        });
+        if (!res.ok) throw new Error('Detalle GPS no disponible');
+        const detail = await res.json();
+        return { ok: true, detail };
+      },
+
+      async fetchGpsBatch(items, codUnidade = 617) {
+        if (await this.isBridgeAvailable()) {
+          const res = await fetch(`${API_BASE}/api/prolog/details-batch`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              usuario: state.credentials.usuario,
+              senha: state.credentials.senha,
+              codUnidade,
+              items
+            })
+          });
+          return await res.json();
+        }
+
+        const details = {};
+        await Promise.all(items.slice(0, 30).map(async (it) => {
+          try {
+            const d = await this.fetchGpsDetail(codUnidade, it.codInicio, it.codFim);
+            if (d && d.ok && d.detail) {
+              details[`${it.codInicio}-${it.codFim}`] = d.detail;
+            }
+          } catch (e) {}
+        }));
+        return { ok: true, details };
+      },
+
+      async getGeofences() {
+        if (await this.isBridgeAvailable()) {
+          try {
+            const res = await fetch(`${API_BASE}/api/prolog/geofences`);
+            const data = await res.json();
+            if (res.ok && data.ok && Array.isArray(data.geofences) && data.geofences.length > 0) {
+              return data.geofences;
+            }
+          } catch (e) {}
+        }
+        const local = localStorage.getItem('prolog_geofences_v1');
+        if (local) {
+          try {
+            const parsed = JSON.parse(local);
+            if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+          } catch (e) {}
+        }
+        return [
+          {
+            id: "geo_cer_ype_01",
+            name: "Planta CER_YPE (Ypané)",
+            color: "#2563eb",
+            active: true,
+            points: [
+              [-25.43716, -57.51318],
+              [-25.43585, -57.50982],
+              [-25.44102, -57.50654],
+              [-25.44281, -57.51034]
+            ]
+          }
+        ];
+      },
+
+      async saveGeofences(geofences) {
+        localStorage.setItem('prolog_geofences_v1', JSON.stringify(geofences));
+        if (await this.isBridgeAvailable()) {
+          try {
+            await fetch(`${API_BASE}/api/prolog/geofences`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ geofences })
+            });
+          } catch (e) {}
+        }
+      },
+
+      async getCustomDrivers() {
+        if (await this.isBridgeAvailable()) {
+          try {
+            const res = await fetch(`${API_BASE}/api/prolog/custom-drivers`);
+            const data = await res.json();
+            if (res.ok && data.ok) return data.customDrivers;
+          } catch (e) {}
+        }
+        const local = localStorage.getItem('prolog_custom_drivers_v1');
+        return local ? JSON.parse(local) : [];
+      },
+
+      async saveCustomDrivers(customDrivers, driverToSave) {
+        localStorage.setItem('prolog_custom_drivers_v1', JSON.stringify(customDrivers));
+        if (await this.isBridgeAvailable()) {
+          try {
+            const res = await fetch(`${API_BASE}/api/prolog/custom-drivers`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ customDrivers, driverToSave })
+            });
+            return await res.json();
+          } catch (e) {}
+        }
+        return { ok: true };
+      }
+    };
+
+    const state = {
+      loggedIn: localStorage.getItem('prolog_logged_in') === 'true',
+      activeModule: 'ABIERTAS', // 'ABIERTAS' | 'INTERJORNADA' | 'DIAS_TRABAJADOS' | 'RELATORIOS' | 'GEOCERCAS'
+      reportSubTab: 'MACROS',   // 'MACROS' | 'ANOMALIAS'
+      interFilter: 'TODOS',     // 'TODOS' | 'ROJO' | 'VERDE'
+      searchQuery: '',
+
+      credentials: {
+        usuario: localStorage.getItem('prolog_usuario') || '00007097243',
+        senha: localStorage.getItem('prolog_senha') || '04022001',
+        codUnidade: 617
+      },
+      userProfile: null,
+
+      // Datos en Tiempo Real (Exclusivo MOTORISTAS)
+      motoristas: [],
+      viagensEmAndamento: [],
+      colaboradoresEmDescanso: [],
+      marcacoesRecientes: [],
+
+      // Datos para Matriz P/DL y Relatorios por rango de fecha
+      periodMarcacoes: [],
+
+      // Caché local de coordenadas GPS por "codInicio-codFim"
+      gpsDetailsByKey: JSON.parse(localStorage.getItem('prolog_gps_cache_v1') || '{}'),
+
+      // Geocercas Poligonales: [{ id, name, color, active, points: [[lat,lng], ...] }]
+      geofences: JSON.parse(localStorage.getItem('prolog_geofences_v1') || '[]'),
+      draftPolygonPoints: [],
+
+      countdown: 15,
+      isSyncing: false
+    };
+
+    // ==================== UTILIDADES DE FECHA Y FORMATO ====================
+    function toIsoDate(d) {
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const dd = String(d.getDate()).padStart(2, '0');
+      return `${yyyy}-${mm}-${dd}`;
+    }
+
+    function formatDateTime(isoStr) {
+      if (!isoStr) return '—';
+      const m = String(isoStr).match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?/);
+      if (m) return `${m[3]}/${m[2]}/${m[1]} ${m[4]}:${m[5]}:${m[6] || '00'}`;
+      return isoStr;
+    }
+
+    function formatDurationHhMm(sec) {
+      if (!sec || sec <= 0) return '00h 00m';
+      const h = Math.floor(sec / 3600);
+      const m = Math.floor((sec % 3600) / 60);
+      return `${String(h).padStart(2, '0')}h ${String(m).padStart(2, '0')}m`;
+    }
+
+    function formatLiveSeconds(sec) {
+      if (!sec || sec <= 0) return '00h 00m 00s';
+      const h = Math.floor(sec / 3600);
+      const m = Math.floor((sec % 3600) / 60);
+      const s = Math.floor(sec % 60);
+      return `${String(h).padStart(2, '0')}h ${String(m).padStart(2, '0')}m ${String(s).padStart(2, '0')}s`;
+    }
+
+    function normalizeText(str) {
+      if (!str) return '';
+      return String(str)
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toUpperCase()
+        .trim();
+    }
+
+    function cleanCpfStr(cpf) {
+      return String(cpf || '').replace(/^0+/, '');
+    }
+
+    // ==================== GEOMETRÍA: PUNTO EN POLÍGONO (RAY-CASTING) ====================
+    function isPointInPolygon(lat, lng, polygonPoints) {
+      if (!Array.isArray(polygonPoints) || polygonPoints.length < 3) return false;
+      const x = Number(lat);
+      const y = Number(lng);
+      if (Number.isNaN(x) || Number.isNaN(y)) return false;
+
+      let inside = false;
+      for (let i = 0, j = polygonPoints.length - 1; i < polygonPoints.length; j = i++) {
+        const xi = Number(polygonPoints[i][0]), yi = Number(polygonPoints[i][1]);
+        const xj = Number(polygonPoints[j][0]), yj = Number(polygonPoints[j][1]);
+        const intersect = ((yi > y) !== (yj > y)) && (x < ((xj - xi) * (y - yi)) / ((yj - yi) || 1e-12) + xi);
+        if (intersect) inside = !inside;
+      }
+      return inside;
+    }
+
+    function evaluateGeofenceForPoint(lat, lng) {
+      const activeGeos = state.geofences.filter((g) => g.active !== false && Array.isArray(g.points) && g.points.length >= 3);
+      if (activeGeos.length === 0) {
+        return { hasGeofences: false, inside: true, matchedName: null };
+      }
+      if (lat == null || lng == null || lat === '' || lng === '') {
+        return { hasGeofences: true, inside: null, matchedName: null }; // Coordenada aún no verificada o sin GPS
+      }
+      for (const g of activeGeos) {
+        if (isPointInPolygon(lat, lng, g.points)) {
+          return { hasGeofences: true, inside: true, matchedName: g.name };
+        }
+      }
+      return { hasGeofences: true, inside: false, matchedName: null };
+    }
+
+    // ==================== LOGIN Y SESIÓN ====================
+    async function handleLoginSubmit(e) {
+      e.preventDefault();
+      const user = document.getElementById('loginUser').value.trim();
+      const pass = document.getElementById('loginPass').value;
+      const btn = document.getElementById('btnLoginSubmit');
+      const errBox = document.getElementById('loginErrorBox');
+      errBox.classList.add('hidden');
+      btn.disabled = true;
+      btn.innerHTML = '<span>Autenticando en Prolog...</span>';
+
+      try {
+        const data = await PrologService.login(user, pass, 617);
+        if (!data || !data.ok) throw new Error(data?.error || 'Credenciales inválidas en Prolog');
+
+        state.credentials.usuario = user;
+        state.credentials.senha = pass;
+        state.loggedIn = true;
+        localStorage.setItem('prolog_usuario', user);
+        localStorage.setItem('prolog_senha', pass);
+        localStorage.setItem('prolog_logged_in', 'true');
+
+        enterDashboard();
+      } catch (err) {
+        errBox.textContent = err.message || 'Error al autenticar en Prolog.';
+        errBox.classList.remove('hidden');
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<span>Ingresar al Panel</span>';
+      }
+    }
+
+    function handleLogout() {
+      state.loggedIn = false;
+      localStorage.setItem('prolog_logged_in', 'false');
+      document.getElementById('appShell').classList.add('hidden');
+      document.getElementById('loginScreen').classList.remove('hidden');
+    }
+
+    async function enterDashboard() {
+      document.getElementById('loginScreen').classList.add('hidden');
+      document.getElementById('appShell').classList.remove('hidden');
+      await loadGeofencesFromServer();
+      await loadCustomDriversFromServer();
+      await syncRealtimeData(true);
+      await loadCustomReportMarks();
+    }
+
+    // ==================== NAVEGACIÓN DE MÓDULOS ====================
+    function switchModule(mod) {
+      state.activeModule = mod;
+      const modules = ['ABIERTAS', 'INTERJORNADA', 'DIAS_TRABAJADOS', 'TURNOS', 'USUARIOS', 'RELATORIOS', 'GEOCERCAS'];
+      const titles = {
+        ABIERTAS: ['Jornadas Abiertas en Tiempo Real', ''],
+        INTERJORNADA: ['Control de Interjornada (Descanso 12 Horas)', 'Ordenado de Mayor a Menor Tiempo de Interjornada · Verde >= 12 hs / Rojo < 12 hs'],
+        DIAS_TRABAJADOS: ['Matriz de Días Trabajados (P / DL)', 'Toca cualquier celda P o DL para ver el detalle de jornada o interjornada'],
+        TURNOS: ['Control de Turnos por Fecha (MAÑANA / TARDE / NOCHE)', 'MAÑANA: 03:00-09:59 hs · TARDE: 10:00-17:59 hs · NOCHE: 18:00-02:59 hs'],
+        USUARIOS: ['Usuarios (Choferes · Función Motorista)', 'Directorio completo de choferes y gestión local de usuarios'],
+        RELATORIOS: ['Relatorios de Macros y Anomalías de Geocerca', 'Descarga por Fechas, Chofer y Marcaciones fuera de Zona (?)'],
+        GEOCERCAS: ['Ajustes · Creador de Geocercas Poligonales', 'Evaluación exclusiva para Macro 444 (Inicio y Fin de Jornada)']
+      };
+
+      modules.forEach((m) => {
+        const el = document.getElementById(`module_${m}`);
+        const btn = document.getElementById(`navBtn_${m}`);
+        if (!el || !btn) return;
+        if (m === mod) {
+          el.classList.remove('hidden');
+          btn.classList.add('active');
+        } else {
+          el.classList.add('hidden');
+          btn.classList.remove('active');
+        }
+      });
+
+      document.getElementById('headerModuleTitle').textContent = titles[mod][0];
+      const subBadge = document.getElementById('headerSubtitleBadge');
+      const subDot = document.getElementById('headerSubtitleDot');
+      if (titles[mod][1]) {
+        subBadge.textContent = titles[mod][1];
+        subBadge.classList.remove('hidden');
+        subDot.classList.remove('hidden');
+      } else {
+        subBadge.textContent = '';
+        subBadge.classList.add('hidden');
+        subDot.classList.add('hidden');
+      }
+
+      if (mod === 'GEOCERCAS') {
+        setTimeout(() => initOrRefreshGeofenceEditorMap(), 80);
+      }
+      renderAllModules();
+    }
+
+    function onGlobalSearch(val) {
+      state.searchQuery = val || '';
+      renderAllModules();
+    }
+
+    // ==================== SINCRONIZACIÓN TIEMPO REAL ====================
+    async function syncRealtimeData(force = false) {
+      if (state.isSyncing && !force) return;
+      state.isSyncing = true;
+      const icon = document.getElementById('headerSyncIcon');
+      icon.classList.add('animate-spin');
+
+      try {
+        const today = new Date();
+        const past7 = new Date(today);
+        past7.setDate(past7.getDate() - 7);
+
+        const data = await PrologService.sync({
+          usuario: state.credentials.usuario,
+          senha: state.credentials.senha,
+          codUnidade: state.credentials.codUnidade,
+          datainicio: toIsoDate(past7),
+          datafim: toIsoDate(today),
+          codTipoIntervalo: '444',
+          force
+        });
+        if (!data || !data.ok) throw new Error(data?.error || 'Error al sincronizar con Prolog');
+
+        state.motoristas = (Array.isArray(data.colaboradores) ? data.colaboradores : [])
+          .filter((c) => String(c.nomeFuncao || 'MOTORISTA').toUpperCase().includes('MOTORISTA'));
+
+        state.viagensEmAndamento = Array.isArray(data.viagensEmAndamento) ? data.viagensEmAndamento : [];
+        state.colaboradoresEmDescanso = Array.isArray(data.colaboradoresEmDescanso) ? data.colaboradoresEmDescanso : [];
+        state.marcacoesRecientes = Array.isArray(data.marcacoes) ? data.marcacoes : [];
+
+        if (data.user?.name) {
+          document.getElementById('sidebarUserLabel').textContent = `${data.user.name} · CER_YPE`;
+        }
+
+        populateDriverSelectDropdown();
+        document.getElementById('globalAlertBar').classList.add('hidden');
+        document.getElementById('lastSyncClock').textContent = new Date().toLocaleTimeString('es-PY', {
+          hour: '2-digit', minute: '2-digit', second: '2-digit'
+        });
+
+        renderAllModules();
+
+        // Resolver en segundo plano las coordenadas GPS de las jornadas abiertas para evaluar geocercas
+        autoFetchOpenShiftsGps();
+      } catch (err) {
+        const alertBar = document.getElementById('globalAlertBar');
+        document.getElementById('globalAlertText').textContent = `Aviso de conexión: ${err.message}`;
+        alertBar.classList.remove('hidden');
+        alertBar.classList.add('flex');
+      } finally {
+        state.isSyncing = false;
+        icon.classList.remove('animate-spin');
+      }
+    }
+
+    function getMotoristaByCpfOrName(cpfRaw, nameRaw) {
+      const cCpf = cleanCpfStr(cpfRaw);
+      for (const m of state.motoristas) {
+        if (cCpf && cleanCpfStr(m.cpf) === cCpf) return m;
+      }
+      const norm = normalizeText(nameRaw);
+      for (const m of state.motoristas) {
+        if (normalizeText(m.nome) === norm) return m;
+      }
+      return null;
+    }
+
+    // ==================== PROCESAMIENTO DE JORNADAS ABIERTAS (SIN FILTRO DE DÍA) ====================
+    function buildOpenShiftsList() {
+      const openList = [];
+      const openCpfs = new Set();
+
+      // 1. Todas las jornadas en curso reportadas por viagens-em-andamento (sin importar el día de inicio)
+      for (const v of state.viagensEmAndamento) {
+        const colab = getMotoristaByCpfOrName(v.cpfColaborador, v.nomeColaborador);
+        if (!colab && state.motoristas.length > 0) continue;
+
+        const cleanCpf = cleanCpfStr(v.cpfColaborador || colab?.cpf);
+        if (cleanCpf) openCpfs.add(cleanCpf);
+
+        // Buscar la marcación 444 (Inicio y Fin de Jornada) correspondiente para obtener su codMarcacaoInicio real
+        const match444 = state.marcacoesRecientes.find((m) => {
+          const mCpf = cleanCpfStr(m.cpfColaborador);
+          return mCpf === cleanCpf && (!m.dataMarcacaoFim || m.dataMarcacaoInicio === v.dataHoraInicioJornada);
+        });
+
+        const subMarks = Array.isArray(v.marcacoesDentroJornada) ? v.marcacoesDentroJornada : [];
+        const firstSub = subMarks[0] || null;
+        const codInicio444 = match444?.codMarcacaoInicio || 0;
+        const codInicioFallback = codInicio444 || firstSub?.codMarcacaoInicio || 0;
+
+        const startIso = v.dataHoraInicioJornada || match444?.dataMarcacaoInicio || '';
+        let elapsedSec = Number(v.jornadaBrutaEmSegundos) || 0;
+        if (startIso) {
+          const liveDiff = Math.floor((Date.now() - new Date(startIso).getTime()) / 1000);
+          if (liveDiff > elapsedSec) elapsedSec = liveDiff;
+        }
+
+        openList.push({
+          cpf: String(v.cpfColaborador || colab?.cpf || '').padStart(11, '0'),
+          cleanCpf,
+          nome: (v.nomeColaborador || colab?.nome || '-').toUpperCase(),
+          equipe: colab?.nomeEquipe || 'CER_YPE',
+          startIso,
+          elapsedSec,
+          codMarcacaoInicio444: codInicio444,
+          codMarcacaoInicioAny: codInicioFallback,
+          codMarcacaoFim: 0
+        });
+      }
+
+      // 2. Cualquier marcación 444 abierta en marcacoesRecientes que no esté aún en openList
+      for (const m of state.marcacoesRecientes) {
+        if (!m.statusAtivoInicio || !m.dataMarcacaoInicio || m.dataMarcacaoFim) continue;
+        if (String(m.codTipoMarcacao || '444') !== '444' && !String(m.nomeTipoMarcacao || '').includes('JORNADA')) continue;
+
+        const colab = getMotoristaByCpfOrName(m.cpfColaborador, m.nomeColaborador);
+        if (!colab && state.motoristas.length > 0) continue;
+
+        const cleanCpf = cleanCpfStr(m.cpfColaborador || colab?.cpf);
+        if (cleanCpf && openCpfs.has(cleanCpf)) continue;
+        if (cleanCpf) openCpfs.add(cleanCpf);
+
+        const elapsedSec = Math.max(0, Math.floor((Date.now() - new Date(m.dataMarcacaoInicio).getTime()) / 1000));
+        openList.push({
+          cpf: String(m.cpfColaborador || colab?.cpf || '').padStart(11, '0'),
+          cleanCpf,
+          nome: (m.nomeColaborador || colab?.nome || '-').toUpperCase(),
+          equipe: colab?.nomeEquipe || 'CER_YPE',
+          startIso: m.dataMarcacaoInicio,
+          elapsedSec,
+          codMarcacaoInicio444: m.codMarcacaoInicio || 0,
+          codMarcacaoInicioAny: m.codMarcacaoInicio || 0,
+          codMarcacaoFim: 0
+        });
+      }
+
+      openList.sort((a, b) => (b.startIso || '').localeCompare(a.startIso || ''));
+      return { openList, openCpfs };
+    }
+
+    async function autoFetchOpenShiftsGps() {
+      const { openList } = buildOpenShiftsList();
+      const missingItems = [];
+      for (const item of openList) {
+        const cIni = item.codMarcacaoInicioAny;
+        if (cIni > 0 && !state.gpsDetailsByKey[`${cIni}-0`]) {
+          missingItems.push({ codInicio: cIni, codFim: 0 });
+        }
+      }
+      if (missingItems.length === 0) return;
+
+      try {
+        const data = await PrologService.fetchGpsBatch(missingItems, state.credentials.codUnidade);
+        if (data && data.ok && data.details) {
+          Object.assign(state.gpsDetailsByKey, data.details);
+          localStorage.setItem('prolog_gps_cache_v1', JSON.stringify(state.gpsDetailsByKey));
+          renderOpenShiftsModule();
+        }
+      } catch (e) {
+        console.warn('Auto GPS batch warn:', e);
+      }
+    }
+
+    function getOpenShiftStyleBySeconds(elapsedSec) {
+      if (elapsedSec >= 12 * 3600) {
+        return {
+          level: 'RED',
+          rowClass: 'bg-rose-50/75 hover:bg-rose-100/75 border-l-4 border-l-rose-500',
+          badgeClass: 'inline-flex items-center gap-2 rounded-xl border border-rose-300 bg-rose-100 px-3 py-1.5 font-mono text-xs font-extrabold text-rose-800 shadow-sm',
+          dotClass: 'h-2 w-2 rounded-full bg-rose-600 animate-ping',
+          pillHtml: '<span class="ml-1 rounded-md bg-rose-600 px-1.5 py-0.5 font-sans text-[10px] font-extrabold text-white">&ge; 12 HS</span>'
+        };
+      }
+      if (elapsedSec >= 11 * 3600) {
+        return {
+          level: 'YELLOW',
+          rowClass: 'bg-amber-50/75 hover:bg-amber-100/75 border-l-4 border-l-amber-400',
+          badgeClass: 'inline-flex items-center gap-2 rounded-xl border border-amber-300 bg-amber-100 px-3 py-1.5 font-mono text-xs font-extrabold text-amber-900 shadow-sm',
+          dotClass: 'h-2 w-2 rounded-full bg-amber-500 animate-ping',
+          pillHtml: '<span class="ml-1 rounded-md bg-amber-500 px-1.5 py-0.5 font-sans text-[10px] font-extrabold text-white">&ge; 11 HS</span>'
+        };
+      }
+      return {
+        level: 'NORMAL',
+        rowClass: 'hover:bg-blue-50/40',
+        badgeClass: 'inline-flex items-center gap-2 rounded-xl bg-blue-50 px-3 py-1.5 font-mono text-xs font-extrabold text-blue-700',
+        dotClass: 'h-2 w-2 rounded-full bg-blue-600 animate-ping',
+        pillHtml: ''
+      };
+    }
+
+    function renderOpenShiftsModule() {
+      const { openList } = buildOpenShiftsList();
+      const q = normalizeText(state.searchQuery);
+      const filtered = q
+        ? openList.filter((r) => normalizeText(r.nome).includes(q) || r.cpf.includes(q) || normalizeText(r.equipe).includes(q))
+        : openList;
+
+      document.getElementById('kpiOpenCount').textContent = openList.length;
+      document.getElementById('navBadgeAbiertas').textContent = openList.length;
+      document.getElementById('openTableBadge').textContent = `${filtered.length} en curso`;
+
+      const avgSec = openList.length > 0
+        ? Math.floor(openList.reduce((acc, r) => acc + r.elapsedSec, 0) / openList.length)
+        : 0;
+      const maxSec = openList.length > 0
+        ? Math.max(...openList.map((r) => r.elapsedSec))
+        : 0;
+
+      document.getElementById('kpiOpenAvgTime').textContent = formatDurationHhMm(avgSec);
+      document.getElementById('kpiOpenMaxTime').textContent = `Jornada más larga actual: ${formatDurationHhMm(maxSec)}`;
+
+      let outsideCount = 0;
+      const tbody = document.getElementById('openShiftsTbody');
+
+      if (filtered.length === 0) {
+        document.getElementById('kpiOpenAnomalies').textContent = '0';
+        tbody.innerHTML = `<tr><td colspan="6" class="py-14 text-center text-slate-400 font-medium">No hay jornadas abiertas que coincidan con la búsqueda.</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = filtered.map((r) => {
+        const cIni = r.codMarcacaoInicioAny;
+        const det = cIni > 0 ? state.gpsDetailsByKey[`${cIni}-0`] : null;
+        const lat = det?.marcacaoInicio?.localizacaoMarcacao?.latitude;
+        const lng = det?.marcacaoInicio?.localizacaoMarcacao?.longitude;
+
+        // Evaluar geocerca SOLO si es macro 444 de Inicio de Jornada
+        const geoEval = evaluateGeofenceForPoint(lat, lng);
+        let geoBadge = `<span class="text-[11px] font-semibold text-slate-400">Sin geocercas</span>`;
+        if (geoEval.hasGeofences) {
+          if (geoEval.inside === false) {
+            outsideCount++;
+            geoBadge = `<span title="Marcó Inicio de Jornada fuera de todas las geocercas" class="inline-flex items-center gap-1 rounded-full border border-amber-300 bg-amber-100 px-3 py-1 text-xs font-extrabold text-amber-800 shadow-sm">
+              <span class="flex h-4 w-4 items-center justify-center rounded-full bg-amber-500 text-[11px] font-black text-white">?</span>
+              <span>Fuera de Zona</span>
+            </span>`;
+          } else if (geoEval.inside === true) {
+            geoBadge = `<span class="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-bold text-emerald-700">
+              <span>✓ ${geoEval.matchedName || 'En Zona'}</span>
+            </span>`;
+          } else {
+            geoBadge = `<span class="text-[11px] text-slate-400">Verificando GPS...</span>`;
+          }
+        }
+
+        const durStyle = getOpenShiftStyleBySeconds(r.elapsedSec);
+        const safeName = r.nome.replace(/'/g, "\\'");
+        return `
+          <tr class="transition ${durStyle.rowClass}">
+            <td class="py-4 pl-6 pr-3">
+              <div class="font-bold text-slate-900 text-sm">${r.nome}</div>
+              <div class="font-mono text-[11px] text-slate-400">CPF: ${r.cpf}</div>
+            </td>
+            <td class="px-4 py-4">
+              <span class="rounded-lg bg-slate-100 px-2.5 py-1 text-[11px] font-bold text-slate-600">${r.equipe}</span>
+            </td>
+            <td class="px-4 py-4 font-mono text-xs font-bold text-slate-700">
+              ${formatDateTime(r.startIso)}
+            </td>
+            <td class="px-4 py-4">
+              <span class="${durStyle.badgeClass}">
+                <span class="${durStyle.dotClass}"></span>
+                <span class="live-duration-cell" data-start="${r.startIso}" data-level="${durStyle.level}">${formatLiveSeconds(r.elapsedSec)}</span>
+                ${durStyle.pillHtml}
+              </span>
+            </td>
+            <td class="px-4 py-4 text-center">${geoBadge}</td>
+            <td class="py-4 pl-3 pr-6 text-right">
+              <button type="button" onclick="openDirectGpsModal(${cIni}, 0, '${safeName}', 'INICIO DE JORNADA', '${r.startIso}')"
+                title="Ver ubicación de marcación en mapa directo"
+                class="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3.5 py-1.5 text-xs font-bold text-blue-600 shadow-sm transition hover:border-blue-500 hover:bg-blue-600 hover:text-white">
+                <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                  <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/>
+                </svg>
+                <span>GPS</span>
+              </button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+
+      document.getElementById('kpiOpenAnomalies').textContent = outsideCount;
+    }
+
+    // ==================== MÓDULO 2: INTERJORNADA (12 HORAS · ORDENADO MAYOR A MENOR) ====================
+    function buildInterjornadaList() {
+      const { openCpfs } = buildOpenShiftsList();
+      const descMap = new Map();
+      for (const d of state.colaboradoresEmDescanso) {
+        descMap.set(normalizeText(d.nomeColaborador), d);
+      }
+
+      // Buscar también último fin de jornada en marcacoesRecientes y periodMarcacoes por CPF
+      const latestEndByCpf = new Map();
+      for (const m of [...state.marcacoesRecientes, ...state.periodMarcacoes]) {
+        if (!m.dataMarcacaoFim) continue;
+        const cCpf = cleanCpfStr(m.cpfColaborador);
+        const prev = latestEndByCpf.get(cCpf);
+        if (!prev || m.dataMarcacaoFim > prev.dataMarcacaoFim) {
+          latestEndByCpf.set(cCpf, m);
+        }
+      }
+
+      const list = [];
+      for (const c of state.motoristas) {
+        const cleanCpf = cleanCpfStr(c.cpf);
+        if (openCpfs.has(cleanCpf)) continue; // Tiene jornada activa -> no está en interjornada
+
+        const dRest = descMap.get(normalizeText(c.nome));
+        const mLast = latestEndByCpf.get(cleanCpf);
+
+        let lastStartIso = dRest?.dataHoraInicioUltimaViagem || mLast?.dataMarcacaoInicio || '';
+        let lastEndIso = dRest?.dataHoraFimUltimaViagem || mLast?.dataMarcacaoFim || '';
+        if (dRest?.dataHoraFimUltimaViagem && mLast?.dataMarcacaoFim) {
+          if (mLast.dataMarcacaoFim > dRest.dataHoraFimUltimaViagem) {
+            lastEndIso = mLast.dataMarcacaoFim;
+            lastStartIso = mLast.dataMarcacaoInicio;
+          }
+        }
+
+        let restSeconds = Number(dRest?.tempoTotalDescansoEmSegundos) || 0;
+        if (lastEndIso) {
+          const calcSec = Math.floor((Date.now() - new Date(lastEndIso).getTime()) / 1000);
+          if (calcSec > 0) restSeconds = calcSec;
+        } else if (restSeconds <= 0) {
+          // Sin registro de viaje previo -> poner al final o con valor alto identificable
+          restSeconds = 0;
+        }
+
+        const restHours = restSeconds / 3600;
+        const isGreen = !lastEndIso || restHours >= 12;
+
+        list.push({
+          cpf: String(c.cpf || '').padStart(11, '0'),
+          cleanCpf,
+          nome: (c.nome || '-').toUpperCase(),
+          equipe: c.nomeEquipe || 'CER_YPE',
+          lastStartIso,
+          lastEndIso,
+          restSeconds,
+          restHours,
+          isGreen
+        });
+      }
+
+      // SIEMPRE ordenado de acuerdo al que tenga MÁS tiempo de interjornada para abajo (Mayor -> Menor)
+      list.sort((a, b) => b.restSeconds - a.restSeconds);
+      return list;
+    }
+
+    function setInterFilter(f) {
+      state.interFilter = f;
+      ['TODOS', 'ROJO', 'VERDE'].forEach((k) => {
+        const btn = document.getElementById(`interBtn_${k}`);
+        btn.className = k === f
+          ? 'rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-bold text-white shadow-sm'
+          : 'rounded-lg px-3 py-1.5 text-xs font-bold text-slate-600 hover:bg-white';
+      });
+      renderInterjornadaModule();
+    }
+
+    function renderInterjornadaModule() {
+      const all = buildInterjornadaList();
+      const greenCount = all.filter((r) => r.isGreen).length;
+      const redCount = all.filter((r) => !r.isGreen).length;
+
+      document.getElementById('interTotalCount').textContent = all.length;
+      document.getElementById('interGreenCount').textContent = greenCount;
+      document.getElementById('interRedCount').textContent = redCount;
+      document.getElementById('navBadgeInterjornada').textContent = all.length;
+
+      let filtered = all;
+      if (state.interFilter === 'VERDE') filtered = all.filter((r) => r.isGreen);
+      if (state.interFilter === 'ROJO') filtered = all.filter((r) => !r.isGreen);
+
+      const q = normalizeText(state.searchQuery);
+      if (q) {
+        filtered = filtered.filter((r) => normalizeText(r.nome).includes(q) || r.cpf.includes(q) || normalizeText(r.equipe).includes(q));
+      }
+
+      const tbody = document.getElementById('interjornadaTbody');
+      if (filtered.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="6" class="py-14 text-center text-slate-400">No hay motoristas para el filtro seleccionado.</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = filtered.map((r) => {
+        const badge = r.isGreen
+          ? `<span class="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 border border-emerald-300 px-3.5 py-1 text-xs font-extrabold text-emerald-800">
+               <span class="h-2 w-2 rounded-full bg-emerald-600"></span>
+               <span>&ge; 12 HS · HABILITADO</span>
+             </span>`
+          : `<span class="inline-flex items-center gap-1.5 rounded-full bg-rose-100 border border-rose-300 px-3.5 py-1 text-xs font-extrabold text-rose-800">
+               <span class="h-2 w-2 rounded-full bg-rose-600 animate-ping"></span>
+               <span>&lt; 12 HS · EN DESCANSO</span>
+             </span>`;
+
+        const timeColor = r.isGreen ? 'text-emerald-700 bg-emerald-50 border-emerald-200' : 'text-rose-700 bg-rose-50 border-rose-200';
+        const timeText = r.lastEndIso ? formatDurationHhMm(r.restSeconds) : '+12h (Sin viaje reciente)';
+
+        return `
+          <tr class="transition ${r.isGreen ? 'hover:bg-emerald-50/30' : 'bg-rose-50/25 hover:bg-rose-50/50'}">
+            <td class="py-3.5 pl-6 pr-3">
+              <div class="font-bold text-slate-900 text-sm">${r.nome}</div>
+              <div class="font-mono text-[11px] text-slate-400">CPF: ${r.cpf}</div>
+            </td>
+            <td class="px-4 py-3.5">
+              <span class="rounded-lg bg-slate-100 px-2.5 py-1 text-[11px] font-bold text-slate-600">${r.equipe}</span>
+            </td>
+            <td class="px-4 py-3.5 font-mono text-slate-600">${formatDateTime(r.lastStartIso)}</td>
+            <td class="px-4 py-3.5 font-mono font-bold text-slate-800">${formatDateTime(r.lastEndIso)}</td>
+            <td class="px-4 py-3.5">
+              <span class="inline-flex rounded-xl border px-3 py-1 font-mono text-xs font-extrabold ${timeColor}">
+                ${timeText}
+              </span>
+            </td>
+            <td class="py-3.5 pl-3 pr-6 text-right">${badge}</td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function exportInterjornadaExcel() {
+      const rows = buildInterjornadaList();
+      const data = [
+        ['CONTROL DE INTERJORNADA (12 HORAS) - MOTORISTAS CER_YPE'],
+        [],
+        ['CHOFER', 'CPF', 'EQUIPO', 'ÚLTIMO INICIO JORNADA', 'ÚLTIMO FIN JORNADA', 'TIEMPO DESCANSO', 'ESTADO 12 HS']
+      ];
+      rows.forEach((r) => {
+        data.push([
+          r.nome, r.cpf, r.equipe,
+          formatDateTime(r.lastStartIso),
+          formatDateTime(r.lastEndIso),
+          r.lastEndIso ? formatDurationHhMm(r.restSeconds) : '+12h',
+          r.isGreen ? 'MAYOR A 12 HS (VERDE)' : 'MENOR A 12 HS (ROJO)'
+        ]);
+      });
+      const wb = XLSX.utils.book_new();
+      const ws = XLSX.utils.aoa_to_sheet(data);
+      ws['!cols'] = [{ wch: 34 }, { wch: 14 }, { wch: 18 }, { wch: 22 }, { wch: 22 }, { wch: 18 }, { wch: 24 }];
+      XLSX.utils.book_append_sheet(wb, ws, 'Interjornada 12h');
+      XLSX.writeFile(wb, `Interjornada_Motoristas_${toIsoDate(new Date())}.xlsx`);
+    }
+
+    // ==================== MÓDULO 3: MATRIZ DE DÍAS TRABAJADOS (P / DL) Y CONTROL DE TURNOS ====================
+    function setMatrixPreset(preset) {
+      const end = new Date();
+      const start = new Date();
+      if (preset === 'MES') {
+        start.setDate(1);
+      } else {
+        start.setDate(end.getDate() - (Number(preset) - 1));
+      }
+      const d1 = toIsoDate(start);
+      const d2 = toIsoDate(end);
+      document.getElementById('matrixDateStart').value = d1;
+      document.getElementById('matrixDateEnd').value = d2;
+      document.getElementById('turnosDateStart').value = d1;
+      document.getElementById('turnosDateEnd').value = d2;
+      loadMatrixAndReportsRange();
+    }
+
+    async function syncTurnosDatesAndLoad() {
+      const d1 = document.getElementById('turnosDateStart').value;
+      const d2 = document.getElementById('turnosDateEnd').value;
+      if (!d1 || !d2) return;
+      document.getElementById('matrixDateStart').value = d1;
+      document.getElementById('matrixDateEnd').value = d2;
+      await loadMatrixAndReportsRange();
+    }
+
+    async function loadMatrixAndReportsRange() {
+      const d1 = document.getElementById('matrixDateStart').value;
+      const d2 = document.getElementById('matrixDateEnd').value;
+      if (!d1 || !d2) return;
+
+      document.getElementById('turnosDateStart').value = d1;
+      document.getElementById('turnosDateEnd').value = d2;
+      document.getElementById('repDateStart').value = d1;
+      document.getElementById('repDateEnd').value = d2;
+      await fetchPeriodMarkings(d1, d2, document.getElementById('repMacroSelect').value);
+    }
+
+    function getDatesArrayBetween(startIso, endIso) {
+      const arr = [];
+      const curr = new Date(startIso + 'T00:00:00');
+      const last = new Date(endIso + 'T00:00:00');
+      while (curr <= last && arr.length <= 35) {
+        arr.push(toIsoDate(curr));
+        curr.setDate(curr.getDate() + 1);
+      }
+      return arr;
+    }
+
+    // Construye un índice de todas las jornadas (cerradas y abiertas) agrupadas por Chofer y Fecha de Inicio
+    function buildShiftsByDriverDateMap() {
+      const mapByCpfDate = new Map();
+      const mapByNameDate = new Map();
+      const seenKeys = new Set();
+
+      function addShiftRecord(cpfRaw, nameRaw, startIso, endIso, durationSec, codInicio, codFim, isOpen) {
+        if (!startIso) return;
+        const dt = String(startIso).slice(0, 10);
+        const cCpf = cleanCpfStr(cpfRaw);
+        const cName = normalizeText(nameRaw);
+        const dedup = `${cCpf || cName}|${startIso}`;
+        if (seenKeys.has(dedup)) return;
+        seenKeys.add(dedup);
+
+        let calcSec = Number(durationSec) || 0;
+        if (endIso && startIso) {
+          const diff = Math.floor((new Date(endIso).getTime() - new Date(startIso).getTime()) / 1000);
+          if (diff > calcSec) calcSec = diff;
+        } else if (!endIso && startIso) {
+          const liveDiff = Math.floor((Date.now() - new Date(startIso).getTime()) / 1000);
+          if (liveDiff > calcSec) calcSec = liveDiff;
+        }
+
+        const rec = {
+          startIso,
+          endIso: endIso || '',
+          durationSec: Math.max(0, calcSec),
+          codInicio: codInicio || 0,
+          codFim: codFim || 0,
+          isOpen: Boolean(isOpen || !endIso),
+          turnCode: classifyShiftTurn(startIso)
+        };
+
+        if (cCpf) {
+          const k1 = `${cCpf}|${dt}`;
+          if (!mapByCpfDate.has(k1)) mapByCpfDate.set(k1, []);
+          mapByCpfDate.get(k1).push(rec);
+        }
+        if (cName) {
+          const k2 = `${cName}|${dt}`;
+          if (!mapByNameDate.has(k2)) mapByNameDate.set(k2, []);
+          mapByNameDate.get(k2).push(rec);
+        }
+      }
+
+      // 1. Jornadas abiertas en vivo
+      for (const v of state.viagensEmAndamento) {
+        addShiftRecord(
+          v.cpfColaborador,
+          v.nomeColaborador,
+          v.dataHoraInicioJornada,
+          '',
+          v.jornadaBrutaEmSegundos,
+          0,
+          0,
+          true
+        );
+      }
+
+      // 2. Marcaciones del periodo (incluyendo ventana previa de 7 días) y recientes (Macro 444 / Jornada)
+      const allHistoricalMarks = [
+        ...(Array.isArray(state.historyMarcacoes) ? state.historyMarcacoes : []),
+        ...state.periodMarcacoes,
+        ...state.marcacoesRecientes
+      ];
+      for (const m of allHistoricalMarks) {
+        if (!m.dataMarcacaoInicio) continue;
+        const tipoName = String(m.nomeTipoMarcacao || 'JORNADA').toUpperCase();
+        if (String(m.codTipoMarcacao || '444') !== '444' && !tipoName.includes('JORNADA')) continue;
+        addShiftRecord(
+          m.cpfColaborador,
+          m.nomeColaborador,
+          m.dataMarcacaoInicio,
+          m.dataMarcacaoFim || '',
+          m.tempoDecorridoEntreInicioFimEmSegundos,
+          m.codMarcacaoInicio,
+          m.codMarcacaoFim,
+          !m.dataMarcacaoFim
+        );
+      }
+
+      return {
+        getShifts(cCpf, cName, dt) {
+          const list = mapByCpfDate.get(`${cCpf}|${dt}`) || mapByNameDate.get(`${cName}|${dt}`) || [];
+          return list.sort((a, b) => (a.startIso || '').localeCompare(b.startIso || ''));
+        },
+        getAllDriverShifts(cCpf, cName) {
+          const collected = [];
+          const seen = new Set();
+          for (const [key, arr] of mapByCpfDate.entries()) {
+            if (cCpf && key.startsWith(`${cCpf}|`)) {
+              for (const item of arr) {
+                if (!seen.has(item.startIso)) {
+                  seen.add(item.startIso);
+                  collected.push(item);
+                }
+              }
+            }
+          }
+          if (collected.length === 0 && cName) {
+            for (const [key, arr] of mapByNameDate.entries()) {
+              if (key.startsWith(`${cName}|`)) {
+                for (const item of arr) {
+                  if (!seen.has(item.startIso)) {
+                    seen.add(item.startIso);
+                    collected.push(item);
+                  }
+                }
+              }
+            }
+          }
+          return collected.sort((a, b) => (a.startIso || '').localeCompare(b.startIso || ''));
+        }
+      };
+    }
+
+    // Clasifica el turno según la hora de inicio:
+    // MAÑANA: 03:00 a 09:59 hs | TARDE: 10:00 a 17:59 hs | NOCHE: 18:00 a 02:59 hs
+    function classifyShiftTurn(isoStr) {
+      if (!isoStr) return 'DL';
+      const m = String(isoStr).match(/T(\d{2}):(\d{2})/);
+      const hour = m ? Number(m[1]) : new Date(isoStr).getHours();
+      if (hour >= 3 && hour <= 9) return 'MAÑANA';
+      if (hour >= 10 && hour <= 17) return 'TARDE';
+      return 'NOCHE';
+    }
+
+    function renderWorkedDaysMatrix() {
+      const d1 = document.getElementById('matrixDateStart').value;
+      const d2 = document.getElementById('matrixDateEnd').value;
+      if (!d1 || !d2) return;
+
+      const dates = getDatesArrayBetween(d1, d2);
+      const thead = document.getElementById('matrixThead');
+      const tbody = document.getElementById('matrixTbody');
+      const shiftIndex = buildShiftsByDriverDateMap();
+
+      thead.innerHTML = `
+        <tr>
+          <th class="sticky left-0 z-10 bg-slate-50 py-3.5 pl-6 pr-4 font-extrabold text-slate-700 border-r border-slate-200">Chofer</th>
+          ${dates.map((dt) => {
+            const [, mm, dd] = dt.split('-');
+            return `<th class="px-2.5 py-3.5 text-center font-mono">${dd}/${mm}</th>`;
+          }).join('')}
+          <th class="px-3 py-3.5 text-center font-extrabold text-emerald-700 bg-emerald-50/60">Total P</th>
+          <th class="px-3 py-3.5 text-center font-extrabold text-slate-500 bg-slate-100/70">Total DL</th>
+        </tr>
+      `;
+
+      const q = normalizeText(state.searchQuery);
+      const sortedDrivers = [...state.motoristas]
+        .filter((m) => !q || normalizeText(m.nome).includes(q) || cleanCpfStr(m.cpf).includes(q))
+        .sort((a, b) => a.nome.localeCompare(b.nome));
+
+      tbody.innerHTML = sortedDrivers.map((c) => {
+        const cCpf = cleanCpfStr(c.cpf);
+        const cName = normalizeText(c.nome);
+        let pCount = 0;
+        let dlCount = 0;
+
+        const cellsHtml = dates.map((dt) => {
+          const shifts = shiftIndex.getShifts(cCpf, cName, dt);
+          if (shifts.length > 0) {
+            pCount++;
+            return `<td class="px-1.5 py-2.5 text-center">
+              <button type="button" onclick="openCellDetailModal('P', '${cCpf}', '${dt}')"
+                title="Clic para ver Inicio, Fin y Tiempo Total de Jornada"
+                class="inline-flex h-6 w-7 cursor-pointer items-center justify-center rounded-md bg-emerald-100 font-mono text-[11px] font-extrabold text-emerald-700 shadow-sm transition hover:scale-110 hover:bg-emerald-600 hover:text-white">P</button>
+            </td>`;
+          } else {
+            dlCount++;
+            return `<td class="px-1.5 py-2.5 text-center">
+              <button type="button" onclick="openCellDetailModal('DL', '${cCpf}', '${dt}')"
+                title="Clic para ver Último Fin de Jornada y Horas de Interjornada"
+                class="inline-flex h-6 w-7 cursor-pointer items-center justify-center rounded-md bg-slate-100 font-mono text-[11px] font-semibold text-slate-500 transition hover:scale-110 hover:bg-slate-700 hover:text-white">DL</button>
+            </td>`;
+          }
+        }).join('');
+
+        return `
+          <tr class="hover:bg-blue-50/30">
+            <td class="sticky left-0 z-10 bg-white py-2.5 pl-6 pr-4 font-bold text-slate-800 whitespace-nowrap border-r border-slate-100">${c.nome.toUpperCase()}</td>
+            ${cellsHtml}
+            <td class="px-3 py-2.5 text-center font-mono font-extrabold text-emerald-700 bg-emerald-50/30">${pCount}</td>
+            <td class="px-3 py-2.5 text-center font-mono font-bold text-slate-500 bg-slate-50">${dlCount}</td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    // ==================== MÓDULO 3B: MATRIZ DE CONTROL DE TURNOS (MAÑANA / TARDE / NOCHE) ====================
+    function renderTurnosMatrix() {
+      const d1 = document.getElementById('turnosDateStart').value || document.getElementById('matrixDateStart').value;
+      const d2 = document.getElementById('turnosDateEnd').value || document.getElementById('matrixDateEnd').value;
+      if (!d1 || !d2) return;
+
+      const dates = getDatesArrayBetween(d1, d2);
+      const thead = document.getElementById('turnosThead');
+      const tbody = document.getElementById('turnosTbody');
+      const shiftIndex = buildShiftsByDriverDateMap();
+
+      thead.innerHTML = `
+        <tr>
+          <th class="sticky left-0 z-10 bg-slate-50 py-3.5 pl-6 pr-4 font-extrabold text-slate-700 border-r border-slate-200">Chofer</th>
+          ${dates.map((dt) => {
+            const [, mm, dd] = dt.split('-');
+            return `<th class="px-2.5 py-3.5 text-center font-mono">${dd}/${mm}</th>`;
+          }).join('')}
+          <th class="px-2.5 py-3.5 text-center font-extrabold text-sky-700 bg-sky-50/70">MAÑANA</th>
+          <th class="px-2.5 py-3.5 text-center font-extrabold text-amber-700 bg-amber-50/70">TARDE</th>
+          <th class="px-2.5 py-3.5 text-center font-extrabold text-indigo-700 bg-indigo-50/70">NOCHE</th>
+          <th class="px-2.5 py-3.5 text-center font-extrabold text-slate-500 bg-slate-100/70">DL</th>
+        </tr>
+      `;
+
+      const q = normalizeText(state.searchQuery);
+      const sortedDrivers = [...state.motoristas]
+        .filter((m) => !q || normalizeText(m.nome).includes(q) || cleanCpfStr(m.cpf).includes(q))
+        .sort((a, b) => a.nome.localeCompare(b.nome));
+
+      tbody.innerHTML = sortedDrivers.map((c) => {
+        const cCpf = cleanCpfStr(c.cpf);
+        const cName = normalizeText(c.nome);
+        let mCount = 0, tCount = 0, nCount = 0, dlCount = 0;
+
+        const cellsHtml = dates.map((dt) => {
+          const shifts = shiftIndex.getShifts(cCpf, cName, dt);
+          if (shifts.length > 0) {
+            const primary = shifts[0];
+            const turn = primary.turnCode;
+            if (turn === 'MAÑANA') {
+              mCount++;
+              return `<td class="px-1 py-2.5 text-center">
+                <button type="button" onclick="openCellDetailModal('P', '${cCpf}', '${dt}')"
+                  title="Turno Mañana (03:00 a 09:59 hs) · Clic para ver horario"
+                  class="inline-flex h-6 min-w-[54px] cursor-pointer items-center justify-center rounded-md border border-sky-200 bg-sky-100 px-1.5 font-mono text-[10px] font-extrabold text-sky-800 shadow-sm transition hover:scale-105 hover:bg-sky-600 hover:text-white">MAÑANA</button>
+              </td>`;
+            } else if (turn === 'TARDE') {
+              tCount++;
+              return `<td class="px-1 py-2.5 text-center">
+                <button type="button" onclick="openCellDetailModal('P', '${cCpf}', '${dt}')"
+                  title="Turno Tarde (10:00 a 17:59 hs) · Clic para ver horario"
+                  class="inline-flex h-6 min-w-[46px] cursor-pointer items-center justify-center rounded-md border border-amber-200 bg-amber-100 px-1.5 font-mono text-[10px] font-extrabold text-amber-800 shadow-sm transition hover:scale-105 hover:bg-amber-600 hover:text-white">TARDE</button>
+              </td>`;
+            } else {
+              nCount++;
+              return `<td class="px-1 py-2.5 text-center">
+                <button type="button" onclick="openCellDetailModal('P', '${cCpf}', '${dt}')"
+                  title="Turno Noche (18:00 a 02:59 hs) · Clic para ver horario"
+                  class="inline-flex h-6 min-w-[46px] cursor-pointer items-center justify-center rounded-md border border-indigo-200 bg-indigo-100 px-1.5 font-mono text-[10px] font-extrabold text-indigo-800 shadow-sm transition hover:scale-105 hover:bg-indigo-600 hover:text-white">NOCHE</button>
+              </td>`;
+            }
+          } else {
+            dlCount++;
+            return `<td class="px-1 py-2.5 text-center">
+              <button type="button" onclick="openCellDetailModal('DL', '${cCpf}', '${dt}')"
+                title="Día Libre · Clic para ver Último Fin de Jornada e Interjornada"
+                class="inline-flex h-6 min-w-[30px] cursor-pointer items-center justify-center rounded-md bg-slate-100 px-1.5 font-mono text-[10px] font-semibold text-slate-400 transition hover:scale-105 hover:bg-slate-700 hover:text-white">DL</button>
+            </td>`;
+          }
+        }).join('');
+
+        return `
+          <tr class="hover:bg-blue-50/30">
+            <td class="sticky left-0 z-10 bg-white py-2.5 pl-6 pr-4 font-bold text-slate-800 whitespace-nowrap border-r border-slate-100">${c.nome.toUpperCase()}</td>
+            ${cellsHtml}
+            <td class="px-2.5 py-2.5 text-center font-mono font-extrabold text-sky-700 bg-sky-50/30">${mCount}</td>
+            <td class="px-2.5 py-2.5 text-center font-mono font-extrabold text-amber-700 bg-amber-50/30">${tCount}</td>
+            <td class="px-2.5 py-2.5 text-center font-mono font-extrabold text-indigo-700 bg-indigo-50/30">${nCount}</td>
+            <td class="px-2.5 py-2.5 text-center font-mono font-bold text-slate-500 bg-slate-50">${dlCount}</td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function exportTurnosExcel() {
+      const d1 = document.getElementById('turnosDateStart').value || document.getElementById('matrixDateStart').value;
+      const d2 = document.getElementById('turnosDateEnd').value || document.getElementById('matrixDateEnd').value;
+      const dates = getDatesArrayBetween(d1, d2);
+      const shiftIndex = buildShiftsByDriverDateMap();
+
+      const header = ['CHOFER', ...dates.map((d) => `${d.slice(8, 10)}/${d.slice(5, 7)}`), 'TOTAL MAÑANA', 'TOTAL TARDE', 'TOTAL NOCHE', 'TOTAL DL'];
+      const aoa = [
+        ['MATRIZ DE CONTROL DE TURNOS (MAÑANA: 03:00-09:59 | TARDE: 10:00-17:59 | NOCHE: 18:00-02:59)'],
+        [],
+        header
+      ];
+
+      const sortedDrivers = [...state.motoristas].sort((a, b) => a.nome.localeCompare(b.nome));
+      sortedDrivers.forEach((c) => {
+        const cCpf = cleanCpfStr(c.cpf);
+        const cName = normalizeText(c.nome);
+        let mC = 0, tC = 0, nC = 0, dlC = 0;
+        const row = [c.nome.toUpperCase()];
+        dates.forEach((dt) => {
+          const shifts = shiftIndex.getShifts(cCpf, cName, dt);
+          if (shifts.length > 0) {
+            const turn = shifts[0].turnCode;
+            row.push(turn);
+            if (turn === 'MAÑANA') mC++;
+            else if (turn === 'TARDE') tC++;
+            else nC++;
+          } else {
+            dlC++;
+            row.push('DL');
+          }
+        });
+        row.push(mC, tC, nC, dlC);
+        aoa.push(row);
+      });
+
+      const wb = XLSX.utils.book_new();
+      const ws = XLSX.utils.aoa_to_sheet(aoa);
+      XLSX.utils.book_append_sheet(wb, ws, 'Control de Turnos');
+      XLSX.writeFile(wb, `Control_Turnos_${d1}_a_${d2}.xlsx`);
+    }
+
+    // ==================== MODAL DE DETALLE AL TOCAR CELDA P O DL ====================
+    function openCellDetailModal(mode, cpfRaw, dateIso) {
+      const colab = getMotoristaByCpfOrName(cpfRaw, '');
+      const driverName = (colab?.nome || 'MOTORISTA').toUpperCase();
+      const cleanCpf = cleanCpfStr(cpfRaw || colab?.cpf);
+      const cName = normalizeText(driverName);
+      const [yyyy, mm, dd] = String(dateIso).split('-');
+      const formattedDate = `${dd}/${mm}/${yyyy}`;
+
+      const modal = document.getElementById('cellDetailModal');
+      const badge = document.getElementById('cellModalTypeBadge');
+      const title = document.getElementById('cellModalDriverName');
+      const sub = document.getElementById('cellModalDateSubtitle');
+      const body = document.getElementById('cellModalBody');
+
+      title.textContent = driverName;
+      sub.textContent = `Fecha consultada: ${formattedDate} · CPF: ${String(colab?.cpf || cpfRaw).padStart(11, '0')}`;
+
+      const shiftIndex = buildShiftsByDriverDateMap();
+
+      if (mode === 'DL') {
+        badge.className = 'inline-flex rounded-full bg-slate-200 px-3 py-0.5 text-[11px] font-extrabold text-slate-700';
+        badge.textContent = `DL · DÍA LIBRE (${formattedDate})`;
+
+        // Buscar SIEMPRE hacia atrás desde la fecha del DL (dateIso):
+        // Ejemplo: si el 13/10 tuvo DL y el 12/10 tuvo P, tomar el fin de jornada de ese 12/10 (o el último anterior a dateIso)
+        const allDriverShifts = shiftIndex.getAllDriverShifts(cleanCpf, cName);
+        const priorShifts = allDriverShifts.filter((s) => String(s.startIso).slice(0, 10) <= dateIso);
+        const prevShift = priorShifts.length > 0 ? priorShifts[priorShifts.length - 1] : null;
+
+        let lastEndIso = prevShift?.endIso || '';
+        let lastStartIso = prevShift?.startIso || '';
+
+        // Respaldo con colaboradoresEmDescanso si su último viaje fue anterior o igual a la fecha consultada
+        if (!lastEndIso) {
+          const dRest = state.colaboradoresEmDescanso.find((d) => normalizeText(d.nomeColaborador) === cName);
+          if (dRest?.dataHoraFimUltimaViagem && String(dRest.dataHoraFimUltimaViagem).slice(0, 10) <= dateIso) {
+            lastEndIso = dRest.dataHoraFimUltimaViagem;
+            lastStartIso = dRest.dataHoraInicioUltimaViagem || '';
+          }
+        }
+
+        // Buscar si hubo una siguiente jornada después de ese DL para calcular las horas exactas de interjornada de ese descanso,
+        // o si aún no volvió a iniciar jornada desde ese último fin, calcular hasta ahora.
+        const nextShift = allDriverShifts.find((s) => String(s.startIso).slice(0, 10) > dateIso);
+        let restSec = 0;
+        let restContextLabel = '';
+        if (lastEndIso) {
+          if (nextShift?.startIso) {
+            restSec = Math.max(0, Math.floor((new Date(nextShift.startIso).getTime() - new Date(lastEndIso).getTime()) / 1000));
+            restContextLabel = `Hasta su siguiente inicio (${formatDateTime(nextShift.startIso)})`;
+          } else {
+            restSec = Math.max(0, Math.floor((Date.now() - new Date(lastEndIso).getTime()) / 1000));
+            restContextLabel = 'Tiempo acumulado desde ese último fin hasta ahora';
+          }
+        }
+
+        const isGreen = !lastEndIso || (restSec / 3600) >= 12;
+
+        body.innerHTML = `
+          <div class="space-y-3">
+            <div class="saas-subcard p-4">
+              <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Último Fin de Jornada (Hacia atrás al ${formattedDate})</span>
+              <p class="mt-1 font-mono text-base font-extrabold text-slate-900">
+                ${lastEndIso ? formatDateTime(lastEndIso) : (lastStartIso ? 'Jornada iniciada el ' + formatDateTime(lastStartIso) + ' (En curso)' : 'Sin registro de jornada previa a esta fecha')}
+              </p>
+              ${lastStartIso ? `<p class="mt-0.5 text-xs text-slate-500">Inició esa jornada anterior: <span class="font-mono font-semibold text-slate-700">${formatDateTime(lastStartIso)}</span></p>` : ''}
+            </div>
+
+            <div class="rounded-2xl border p-4 ${isGreen ? 'border-emerald-200 bg-emerald-50/70' : 'border-rose-200 bg-rose-50/70'}">
+              <span class="text-[11px] font-bold uppercase tracking-wider ${isGreen ? 'text-emerald-700' : 'text-rose-700'}">
+                Horas de Interjornada desde ese Último Fin
+              </span>
+              <div class="mt-1 flex items-center justify-between gap-2">
+                <span class="font-mono text-2xl font-extrabold ${isGreen ? 'text-emerald-800' : 'text-rose-800'}">
+                  ${lastEndIso ? formatDurationHhMm(restSec) : '+12 hs (Sin viaje previo)'}
+                </span>
+                <span class="rounded-full px-3 py-1 text-xs font-extrabold ${isGreen ? 'bg-emerald-600 text-white' : 'bg-rose-600 text-white'}">
+                  ${isGreen ? '≥ 12 HS CUMPLIDAS' : '< 12 HS DE DESCANSO'}
+                </span>
+              </div>
+              ${restContextLabel ? `<p class="mt-1.5 text-[11px] font-medium text-slate-500">${restContextLabel}</p>` : ''}
+            </div>
+          </div>
+        `;
+      } else {
+        // Modo P (Presente) o Turno (MAÑANA / TARDE / NOCHE)
+        const shifts = shiftIndex.getShifts(cleanCpf, cName, dateIso);
+
+        badge.className = 'inline-flex rounded-full bg-emerald-100 px-3 py-0.5 text-[11px] font-extrabold text-emerald-800';
+        badge.textContent = `P · PRESENTE (${shifts.length} JORNADA${shifts.length > 1 ? 'S' : ''} EN ESTA FECHA)`;
+
+        body.innerHTML = shifts.map((s, idx) => {
+          const turnBadge = s.turnCode === 'MAÑANA'
+            ? `<span class="rounded-md bg-sky-100 px-2.5 py-0.5 font-mono text-xs font-extrabold text-sky-800">TURNO MAÑANA (03:00-09:59)</span>`
+            : s.turnCode === 'TARDE'
+            ? `<span class="rounded-md bg-amber-100 px-2.5 py-0.5 font-mono text-xs font-extrabold text-amber-800">TURNO TARDE (10:00-17:59)</span>`
+            : `<span class="rounded-md bg-indigo-100 px-2.5 py-0.5 font-mono text-xs font-extrabold text-indigo-800">TURNO NOCHE (18:00-02:59)</span>`;
+
+          return `
+            <div class="saas-subcard p-4 space-y-3">
+              <div class="flex items-center justify-between border-b border-slate-200/80 pb-2.5">
+                <span class="text-xs font-extrabold text-slate-700">Jornada #${idx + 1}</span>
+                ${turnBadge}
+              </div>
+
+              <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div class="rounded-xl bg-white p-3 border border-slate-200/80">
+                  <span class="text-[10px] font-bold uppercase text-slate-400">Inicio de Jornada</span>
+                  <p class="mt-0.5 font-mono text-xs font-extrabold text-slate-900">${formatDateTime(s.startIso)}</p>
+                </div>
+
+                <div class="rounded-xl bg-white p-3 border border-slate-200/80">
+                  <span class="text-[10px] font-bold uppercase text-slate-400">Fin de Jornada</span>
+                  <p class="mt-0.5 font-mono text-xs font-extrabold ${s.endIso ? 'text-slate-900' : 'text-blue-600'}">
+                    ${s.endIso ? formatDateTime(s.endIso) : 'En curso (Jornada Abierta)'}
+                  </p>
+                </div>
+              </div>
+
+              <div class="flex items-center justify-between rounded-xl bg-blue-50/80 border border-blue-200 px-4 py-3">
+                <span class="text-xs font-extrabold text-blue-900">Tiempo Total de su Jornada:</span>
+                <span class="font-mono text-lg font-extrabold text-blue-700">${formatDurationHhMm(s.durationSec)}</span>
+              </div>
+            </div>
+          `;
+        }).join('');
+      }
+
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+    }
+
+    function closeCellDetailModal() {
+      const modal = document.getElementById('cellDetailModal');
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+    }
+
+    // ==================== MÓDULO 3C: GESTIÓN DE USUARIOS (CHOFERES) ====================
+    state.customDrivers = [];
+
+    async function loadCustomDriversFromServer() {
+      try {
+        state.customDrivers = await PrologService.getCustomDrivers();
+      } catch (e) {}
+    }
+
+    function renderUsuariosModule() {
+      const q = normalizeText(state.searchQuery);
+      const { openCpfs } = buildOpenShiftsList();
+      const sorted = [...state.motoristas]
+        .filter((c) => !q || normalizeText(c.nome).includes(q) || cleanCpfStr(c.cpf).includes(q) || normalizeText(c.nomeEquipe).includes(q))
+        .sort((a, b) => a.nome.localeCompare(b.nome));
+
+      const totalCount = state.motoristas.length;
+      document.getElementById('navBadgeUsuarios').textContent = totalCount;
+      document.getElementById('usrCountTotalBadge').textContent = totalCount;
+      document.getElementById('usuariosTableCount').textContent = `${sorted.length} choferes`;
+
+      const tbody = document.getElementById('usuariosTbody');
+      if (sorted.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" class="py-12 text-center text-slate-400">No se encontraron choferes con ese criterio.</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = sorted.map((c) => {
+        const cpfPadded = String(c.cpf || '').padStart(11, '0');
+        const cCpf = cleanCpfStr(c.cpf);
+        const inShift = openCpfs.has(cCpf);
+        const tagOrigin = c.creadoLocal
+          ? `<span class="ml-2 rounded-md bg-blue-100 px-2 py-0.5 text-[10px] font-extrabold text-blue-700">NUEVO LOCAL</span>`
+          : c.editadoLocal
+          ? `<span class="ml-2 rounded-md bg-amber-100 px-2 py-0.5 text-[10px] font-extrabold text-amber-800">EDITADO</span>`
+          : '';
+
+        const statusBadge = inShift
+          ? `<span class="inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-3 py-1 text-[11px] font-extrabold text-blue-700">
+               <span class="h-2 w-2 rounded-full bg-blue-600 animate-ping"></span> En Jornada
+             </span>`
+          : `<span class="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-[11px] font-bold text-emerald-700">
+               <span class="h-2 w-2 rounded-full bg-emerald-500"></span> Activo
+             </span>`;
+
+        return `
+          <tr class="hover:bg-blue-50/30">
+            <td class="py-3.5 pl-6 pr-3">
+              <div class="font-bold text-slate-900">${(c.nome || '-').toUpperCase()}${tagOrigin}</div>
+            </td>
+            <td class="px-4 py-3.5 font-mono font-bold text-slate-700">${cpfPadded}</td>
+            <td class="px-4 py-3.5 font-mono text-slate-600">${c.matriculaAmbev || '—'}</td>
+            <td class="px-4 py-3.5">
+              <span class="rounded-lg bg-blue-50 px-2.5 py-1 text-[11px] font-bold text-blue-700">${c.nomeFuncao || 'MOTORISTA'}</span>
+            </td>
+            <td class="px-4 py-3.5">
+              <span class="rounded-lg bg-slate-100 px-2.5 py-1 text-[11px] font-bold text-slate-600">${c.nomeEquipe || 'CER_YPE'}</span>
+            </td>
+            <td class="px-4 py-3.5 text-center">${statusBadge}</td>
+            <td class="py-3.5 pl-3 pr-6 text-right">
+              <button type="button" onclick="openDriverModal('${cCpf}')"
+                class="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-blue-600 shadow-sm transition hover:bg-blue-600 hover:text-white">
+                <span>✏️ Editar</span>
+              </button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function openDriverModal(cpfToEdit = '') {
+      const modal = document.getElementById('driverEditModal');
+      const title = document.getElementById('driverModalTitle');
+      const origInput = document.getElementById('drvFormOriginalCpf');
+      const nomeInput = document.getElementById('drvFormNome');
+      const cpfInput = document.getElementById('drvFormCpf');
+      const matInput = document.getElementById('drvFormMatricula');
+      const eqInput = document.getElementById('drvFormEquipe');
+
+      if (cpfToEdit) {
+        const colab = getMotoristaByCpfOrName(cpfToEdit, '');
+        title.textContent = 'Editar Datos del Chofer';
+        origInput.value = cleanCpfStr(cpfToEdit);
+        nomeInput.value = (colab?.nome || '').toUpperCase();
+        cpfInput.value = String(colab?.cpf || cpfToEdit).padStart(11, '0');
+        matInput.value = colab?.matriculaAmbev || '';
+        eqInput.value = colab?.nomeEquipe || 'CER_YPE';
+      } else {
+        title.textContent = 'Agregar Nuevo Chofer';
+        origInput.value = '';
+        nomeInput.value = '';
+        cpfInput.value = '';
+        matInput.value = '';
+        eqInput.value = 'CER_YPE';
+      }
+
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+    }
+
+    function closeDriverModal() {
+      const modal = document.getElementById('driverEditModal');
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+    }
+
+    async function handleSaveDriverSubmit(e) {
+      e.preventDefault();
+      const origCpf = cleanCpfStr(document.getElementById('drvFormOriginalCpf').value);
+      const nome = document.getElementById('drvFormNome').value.trim().toUpperCase();
+      const cpf = String(document.getElementById('drvFormCpf').value.trim()).padStart(11, '0');
+      const cleanNewCpf = cleanCpfStr(cpf);
+      const matriculaAmbev = document.getElementById('drvFormMatricula').value.trim();
+      const nomeEquipe = document.getElementById('drvFormEquipe').value.trim().toUpperCase() || 'CER_YPE';
+
+      if (!nome || !cleanNewCpf) return;
+
+      // Actualizar en state.customDrivers
+      const idx = state.customDrivers.findIndex((d) => cleanCpfStr(d.cpf) === (origCpf || cleanNewCpf));
+      const entry = {
+        cpf,
+        nome,
+        matriculaAmbev,
+        nomeEquipe,
+        nomeFuncao: 'MOTORISTA',
+        statusAtivo: true
+      };
+      if (idx >= 0) {
+        state.customDrivers[idx] = entry;
+      } else {
+        state.customDrivers.push(entry);
+      }
+
+      try {
+        const data = await PrologService.saveCustomDrivers(state.customDrivers, entry);
+        if (data && data.ok) {
+          if (Array.isArray(data.colaboradores)) {
+            state.motoristas = data.colaboradores;
+          }
+          if (data.directResults && data.directResults.length > 0) {
+            const dr = data.directResults[0];
+            if (dr.success) {
+              alert('✅ Guardado DIRECTAMENTE en la base de datos oficial de Prolog con éxito!');
+            } else if (dr.statusCode === 403) {
+              alert('⚠️ Guardado en el sistema, pero Prolog rechazó escribir en su base de datos oficial:\n\n' +
+                    'Error 403 (Prohibido): El usuario actual (' + (state.sessionUser || '00007097243') + ') tiene perfil de filial en Prolog y carece del permiso administrativo (310/325 - Cadastrar/Editar).\n\n' +
+                    'Para que Prolog lo guarde directamente en su base, se debe solicitar al Administrador de Fadel en Prolog que habilite esos permisos a tu usuario, o ingresar con una cuenta con rol Administrador.');
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('Warn guardando chofer:', err);
+      }
+
+      closeDriverModal();
+      populateDriverSelectDropdown();
+      renderAllModules();
+    }
+
+    function exportUsuariosExcel() {
+      const sorted = [...state.motoristas].sort((a, b) => a.nome.localeCompare(b.nome));
+      const aoa = [
+        ['DIRECTORIO DE USUARIOS (MOTORISTAS) - PROLOG CER_YPE'],
+        [],
+        ['NOMBRE DEL CHOFER', 'CPF / USUARIO', 'MATRÍCULA AMBEV', 'FUNCIÓN', 'EQUIPO', 'ESTADO']
+      ];
+      sorted.forEach((c) => {
+        aoa.push([
+          (c.nome || '-').toUpperCase(),
+          String(c.cpf || '').padStart(11, '0'),
+          c.matriculaAmbev || '',
+          c.nomeFuncao || 'MOTORISTA',
+          c.nomeEquipe || 'CER_YPE',
+          'ACTIVO'
+        ]);
+      });
+      const wb = XLSX.utils.book_new();
+      const ws = XLSX.utils.aoa_to_sheet(aoa);
+      ws['!cols'] = [{ wch: 36 }, { wch: 16 }, { wch: 18 }, { wch: 16 }, { wch: 16 }, { wch: 14 }];
+      XLSX.utils.book_append_sheet(wb, ws, 'Usuarios Motoristas');
+      XLSX.writeFile(wb, `Usuarios_Motoristas_CER_YPE_${toIsoDate(new Date())}.xlsx`);
+    }
+
+    function exportMatrixExcel() {
+      const d1 = document.getElementById('matrixDateStart').value;
+      const d2 = document.getElementById('matrixDateEnd').value;
+      const dates = getDatesArrayBetween(d1, d2);
+
+      const workedSet = new Set();
+      [...state.periodMarcacoes, ...state.marcacoesRecientes].forEach((m) => {
+        if (!m.dataMarcacaoInicio) return;
+        const dt = String(m.dataMarcacaoInicio).slice(0, 10);
+        workedSet.add(`${cleanCpfStr(m.cpfColaborador)}|${dt}`);
+        workedSet.add(`${normalizeText(m.nomeColaborador)}|${dt}`);
+      });
+
+      const header = ['CHOFER', ...dates.map((d) => `${d.slice(8, 10)}/${d.slice(5, 7)}`), 'TOTAL P', 'TOTAL DL'];
+      const aoa = [['MATRIZ DE DÍAS TRABAJADOS (P = PRESENTE / DL = DÍA LIBRE)'], [], header];
+
+      const sortedDrivers = [...state.motoristas].sort((a, b) => a.nome.localeCompare(b.nome));
+      sortedDrivers.forEach((c) => {
+        const cCpf = cleanCpfStr(c.cpf);
+        const cName = normalizeText(c.nome);
+        let p = 0, dl = 0;
+        const row = [c.nome.toUpperCase()];
+        dates.forEach((dt) => {
+          const has = workedSet.has(`${cCpf}|${dt}`) || workedSet.has(`${cName}|${dt}`);
+          if (has) { p++; row.push('P'); } else { dl++; row.push('DL'); }
+        });
+        row.push(p, dl);
+        aoa.push(row);
+      });
+
+      const wb = XLSX.utils.book_new();
+      const ws = XLSX.utils.aoa_to_sheet(aoa);
+      XLSX.utils.book_append_sheet(wb, ws, 'Dias Trabajados');
+      XLSX.writeFile(wb, `Matriz_Dias_Trabajados_${d1}_a_${d2}.xlsx`);
+    }
+
+    // ==================== MÓDULO 4: RELATORIOS (MACROS Y ANOMALÍAS ?) ====================
+    function populateDriverSelectDropdown() {
+      const sel = document.getElementById('repDriverSelect');
+      const currentVal = sel.value;
+      const sorted = [...state.motoristas].sort((a, b) => a.nome.localeCompare(b.nome));
+      sel.innerHTML = `<option value="TODOS">Todos los Motoristas (${sorted.length})</option>` +
+        sorted.map((c) => `<option value="${cleanCpfStr(c.cpf)}">${c.nome.toUpperCase()}</option>`).join('');
+      if (currentVal) sel.value = currentVal;
+    }
+
+    function switchReportSubTab(sub) {
+      state.reportSubTab = sub;
+      const btnM = document.getElementById('relSubBtn_MACROS');
+      const btnA = document.getElementById('relSubBtn_ANOMALIAS');
+      if (sub === 'MACROS') {
+        btnM.className = 'rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white shadow-sm';
+        btnA.className = 'rounded-xl px-4 py-2 text-xs font-bold text-slate-600 hover:text-slate-900';
+        document.getElementById('repTableTitle').textContent = 'Listado de Macros Registradas';
+      } else {
+        btnA.className = 'rounded-xl bg-amber-600 px-4 py-2 text-xs font-bold text-white shadow-sm';
+        btnM.className = 'rounded-xl px-4 py-2 text-xs font-bold text-slate-600 hover:text-slate-900';
+        document.getElementById('repTableTitle').textContent = 'Relatorio de Anomalías (? Marcaciones de Inicio/Fin de Jornada Fuera de Geocerca)';
+        document.getElementById('repMacroSelect').value = '444';
+      }
+      renderRelatoriosView();
+    }
+
+    async function onChangeReportMacro() {
+      await loadCustomReportMarks();
+    }
+
+    async function loadCustomReportMarks() {
+      const d1 = document.getElementById('repDateStart').value;
+      const d2 = document.getElementById('repDateEnd').value;
+      const macro = document.getElementById('repMacroSelect').value;
+      if (!d1 || !d2) return;
+      document.getElementById('matrixDateStart').value = d1;
+      document.getElementById('matrixDateEnd').value = d2;
+      document.getElementById('turnosDateStart').value = d1;
+      document.getElementById('turnosDateEnd').value = d2;
+      await fetchPeriodMarkings(d1, d2, macro);
+    }
+
+    async function fetchPeriodMarkings(d1, d2, macroType) {
+      try {
+        const lookbackDate = new Date(d1 + 'T00:00:00');
+        lookbackDate.setDate(lookbackDate.getDate() - 7);
+        const queryStart = toIsoDate(lookbackDate);
+
+        const data = await PrologService.sync({
+          usuario: state.credentials.usuario,
+          senha: state.credentials.senha,
+          codUnidade: state.credentials.codUnidade,
+          datainicio: queryStart,
+          datafim: d2,
+          codTipoIntervalo: macroType || 'TODOS',
+          exactDates: true
+        });
+        if (data && data.ok) {
+          const allMarks = Array.isArray(data.marcacoes) ? data.marcacoes : [];
+          state.historyMarcacoes = allMarks;
+          state.periodMarcacoes = allMarks.filter((m) => {
+            const dt = String(m.dataMarcacaoInicio || '').slice(0, 10);
+            return dt >= d1 && dt <= d2;
+          });
+          renderWorkedDaysMatrix();
+          renderTurnosMatrix();
+          renderRelatoriosView();
+        }
+      } catch (e) {
+        console.warn('Error cargando periodo:', e);
+      }
+    }
+
+    async function verifyPeriodGpsCoordinates() {
+      const statusEl = document.getElementById('gpsBatchStatusText');
+      const marks444 = state.periodMarcacoes.filter((m) =>
+        String(m.nomeTipoMarcacao || '').toUpperCase().includes('JORNADA')
+      );
+
+      const batchItems = [];
+      for (const m of marks444) {
+        const cIni = m.codMarcacaoInicio || 0;
+        const cFim = m.codMarcacaoFim || 0;
+        const key = `${cIni}-${cFim}`;
+        if ((cIni > 0 || cFim > 0) && !state.gpsDetailsByKey[key]) {
+          batchItems.push({ codInicio: cIni, codFim: cFim });
+        }
+      }
+
+      if (batchItems.length === 0) {
+        statusEl.textContent = '✓ Todas las coordenadas GPS del periodo ya están verificadas.';
+        renderRelatoriosView();
+        return;
+      }
+
+      statusEl.textContent = `Consultando coordenadas GPS de ${batchItems.length} jornadas...`;
+      try {
+        const chunkSize = 25;
+        for (let i = 0; i < batchItems.length; i += chunkSize) {
+          const slice = batchItems.slice(i, i + chunkSize);
+          statusEl.textContent = `Verificando GPS (${Math.min(i + chunkSize, batchItems.length)}/${batchItems.length})...`;
+          const data = await PrologService.fetchGpsBatch(slice, state.credentials.codUnidade);
+          if (data && data.ok && data.details) {
+            Object.assign(state.gpsDetailsByKey, data.details);
+          }
+        }
+        localStorage.setItem('prolog_gps_cache_v1', JSON.stringify(state.gpsDetailsByKey));
+        statusEl.textContent = '✓ Coordenadas GPS verificadas contra las geocercas poligonales.';
+        renderRelatoriosView();
+      } catch (e) {
+        statusEl.textContent = 'Error al verificar lote GPS.';
+      }
+    }
+
+    function getFilteredReportRows() {
+      const driverFilter = document.getElementById('repDriverSelect').value;
+      const q = normalizeText(state.searchQuery);
+
+      const rows = [];
+      for (const m of state.periodMarcacoes) {
+        const colab = getMotoristaByCpfOrName(m.cpfColaborador, m.nomeColaborador);
+        if (!colab && state.motoristas.length > 0) continue;
+
+        const cleanCpf = cleanCpfStr(m.cpfColaborador || colab?.cpf);
+        if (driverFilter !== 'TODOS' && cleanCpf !== driverFilter) continue;
+
+        const nome = (m.nomeColaborador || colab?.nome || '-').toUpperCase();
+        if (q && !normalizeText(nome).includes(q) && !cleanCpf.includes(q)) continue;
+
+        const isJornada444 = String(m.nomeTipoMarcacao || '').toUpperCase().includes('JORNADA');
+        const cIni = m.codMarcacaoInicio || 0;
+        const cFim = m.codMarcacaoFim || 0;
+        const det = state.gpsDetailsByKey[`${cIni}-${cFim}`] || state.gpsDetailsByKey[`${cIni}-0`] || null;
+
+        const latIni = det?.marcacaoInicio?.localizacaoMarcacao?.latitude;
+        const lngIni = det?.marcacaoInicio?.localizacaoMarcacao?.longitude;
+        const latFim = det?.marcacaoFim?.localizacaoMarcacao?.latitude;
+        const lngFim = det?.marcacaoFim?.localizacaoMarcacao?.longitude;
+
+        const evalIni = isJornada444 ? evaluateGeofenceForPoint(latIni, lngIni) : { hasGeofences: false, inside: true };
+        const evalFim = (isJornada444 && cFim > 0) ? evaluateGeofenceForPoint(latFim, lngFim) : { hasGeofences: false, inside: true };
+
+        const isAnomaly = isJornada444 && (evalIni.inside === false || evalFim.inside === false);
+        if (state.reportSubTab === 'ANOMALIAS' && !isAnomaly) continue;
+
+        rows.push({
+          cpf: String(m.cpfColaborador || colab?.cpf || '').padStart(11, '0'),
+          nome,
+          equipe: colab?.nomeEquipe || 'CER_YPE',
+          macro: m.nomeTipoMarcacao || 'INICIO Y FIN DE JORNADA',
+          startIso: m.dataMarcacaoInicio || '',
+          endIso: m.dataMarcacaoFim || '',
+          durationSec: Number(m.tempoDecorridoEntreInicioFimEmSegundos) || 0,
+          cIni,
+          cFim,
+          isJornada444,
+          evalIni,
+          evalFim,
+          isAnomaly
+        });
+      }
+
+      rows.sort((a, b) => (b.startIso || '').localeCompare(a.startIso || ''));
+      return rows;
+    }
+
+    function renderRelatoriosView() {
+      const rows = getFilteredReportRows();
+      document.getElementById('repTableCountBadge').textContent = `${rows.length} registros`;
+      const tbody = document.getElementById('repTableTbody');
+
+      if (rows.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" class="py-14 text-center text-slate-400">
+          ${state.reportSubTab === 'ANOMALIAS'
+            ? 'No se detectaron anomalías fuera de geocerca (?) en las coordenadas verificadas. Pulsa "Verificar GPS de Geocercas del Periodo" para analizar todas las marcaciones.'
+            : 'No hay marcaciones para el filtro seleccionado.'}
+        </td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = rows.slice(0, 300).map((r) => {
+        let geoCell = '<span class="text-slate-300">—</span>';
+        if (r.isJornada444 && state.geofences.length > 0) {
+          const bIni = r.evalIni.inside === false
+            ? `<span class="inline-flex items-center gap-1 rounded-md bg-amber-100 px-2 py-0.5 font-bold text-amber-800" title="Inicio fuera de geocerca">? Inicio</span>`
+            : r.evalIni.inside === true
+            ? `<span class="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-0.5 font-bold text-emerald-700">✓ Inicio</span>`
+            : `<span class="text-slate-400">Inicio s/verificar</span>`;
+
+          const bFim = r.cFim > 0
+            ? (r.evalFim.inside === false
+                ? `<span class="inline-flex items-center gap-1 rounded-md bg-amber-100 px-2 py-0.5 font-bold text-amber-800" title="Fin fuera de geocerca">? Fin</span>`
+                : r.evalFim.inside === true
+                ? `<span class="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-0.5 font-bold text-emerald-700">✓ Fin</span>`
+                : `<span class="text-slate-400">Fin s/verificar</span>`)
+            : '';
+          geoCell = `<div class="flex items-center justify-center gap-1.5">${bIni}${bFim}</div>`;
+        }
+
+        const safeName = r.nome.replace(/'/g, "\\'");
+        return `
+          <tr class="hover:bg-blue-50/30 ${r.isAnomaly ? 'bg-amber-50/40' : ''}">
+            <td class="py-3.5 pl-6 pr-3 font-bold text-slate-900">${r.nome}</td>
+            <td class="px-4 py-3.5">
+              <span class="rounded-lg bg-blue-50 px-2.5 py-1 text-[11px] font-bold text-blue-700">${r.macro}</span>
+            </td>
+            <td class="px-4 py-3.5 font-mono text-slate-700">${formatDateTime(r.startIso)}</td>
+            <td class="px-4 py-3.5 font-mono text-slate-700">${r.endIso ? formatDateTime(r.endIso) : '<span class="text-blue-600 font-bold">Abierta</span>'}</td>
+            <td class="px-4 py-3.5 font-mono font-bold text-slate-800">${formatDurationHhMm(r.durationSec)}</td>
+            <td class="px-4 py-3.5 text-center">${geoCell}</td>
+            <td class="py-3.5 pl-3 pr-6 text-right">
+              <button type="button" onclick="openDirectGpsModal(${r.cIni}, ${r.cFim}, '${safeName}', '${r.macro}', '${r.startIso}')"
+                class="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-bold text-blue-600 hover:bg-blue-600 hover:text-white">
+                <span>📍 GPS</span>
+              </button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function exportReportExcel() {
+      const rows = getFilteredReportRows();
+      const title = state.reportSubTab === 'ANOMALIAS'
+        ? 'RELATORIO DE ANOMALÍAS FUERA DE GEOCERCA (?) - INICIO Y FIN DE JORNADA'
+        : 'RELATORIO DE MACROS POR FECHA Y CHOFER - PROLOG CER_YPE';
+      const aoa = [
+        [title],
+        [],
+        ['CHOFER', 'CPF', 'EQUIPO', 'MACRO', 'INICIO', 'FIN', 'DURACIÓN', 'GEOCERCA INICIO', 'GEOCERCA FIN']
+      ];
+      rows.forEach((r) => {
+        aoa.push([
+          r.nome, r.cpf, r.equipe, r.macro,
+          formatDateTime(r.startIso),
+          r.endIso ? formatDateTime(r.endIso) : 'ABIERTA',
+          formatDurationHhMm(r.durationSec),
+          r.isJornada444 ? (r.evalIni.inside === false ? '? FUERA DE GEOCERCA' : r.evalIni.inside === true ? 'EN ZONA' : 'SIN VERIFICAR') : 'N/A',
+          r.isJornada444 && r.cFim > 0 ? (r.evalFim.inside === false ? '? FUERA DE GEOCERCA' : r.evalFim.inside === true ? 'EN ZONA' : 'SIN VERIFICAR') : 'N/A'
+        ]);
+      });
+      const wb = XLSX.utils.book_new();
+      const ws = XLSX.utils.aoa_to_sheet(aoa);
+      ws['!cols'] = [{ wch: 34 }, { wch: 14 }, { wch: 16 }, { wch: 26 }, { wch: 22 }, { wch: 22 }, { wch: 14 }, { wch: 22 }, { wch: 22 }];
+      XLSX.utils.book_append_sheet(wb, ws, 'Relatorio');
+      XLSX.writeFile(wb, `Relatorio_${state.reportSubTab}_${toIsoDate(new Date())}.xlsx`);
+    }
+
+    function exportReportCsv() {
+      const rows = getFilteredReportRows();
+      const headers = ['CHOFER', 'CPF', 'EQUIPO', 'MACRO', 'INICIO', 'FIN', 'DURACION', 'GEOCERCA_INICIO', 'GEOCERCA_FIN'];
+      const esc = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+      const lines = rows.map((r) => [
+        r.nome, r.cpf, r.equipe, r.macro,
+        formatDateTime(r.startIso),
+        r.endIso ? formatDateTime(r.endIso) : 'ABIERTA',
+        formatDurationHhMm(r.durationSec),
+        r.isJornada444 && r.evalIni.inside === false ? '? FUERA DE GEOCERCA' : 'OK',
+        r.isJornada444 && r.evalFim.inside === false ? '? FUERA DE GEOCERCA' : 'OK'
+      ].map(esc).join(';'));
+      const blob = new Blob(['\uFEFF' + [headers.join(';'), ...lines].join('\r\n')], { type: 'text/csv;charset=utf-8;' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `Relatorio_${state.reportSubTab}_${toIsoDate(new Date())}.csv`;
+      a.click();
+    }
+
+    // ==================== MÓDULO 5: CREADOR DE GEOCERCAS POLIGONALES ====================
+    let geoEditorMap = null;
+    let geoEditorSatellite = false;
+    let geoTileLayer = null;
+    let draftPolygonLayer = null;
+    let draftMarkers = [];
+    let savedGeoLayers = [];
+
+    async function loadGeofencesFromServer() {
+      try {
+        state.geofences = await PrologService.getGeofences();
+      } catch (e) {}
+      renderGeofencesList();
+    }
+
+    async function persistGeofences() {
+      renderGeofencesList();
+      renderAllModules();
+      await PrologService.saveGeofences(state.geofences);
+    }
+
+    function initOrRefreshGeofenceEditorMap() {
+      if (!geoEditorMap) {
+        geoEditorMap = L.map('geofenceEditorMap').setView([-25.4724, -57.5145], 14);
+        geoTileLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          attribution: '&copy; OpenStreetMap'
+        }).addTo(geoEditorMap);
+
+        geoEditorMap.on('click', (e) => {
+          state.draftPolygonPoints.push([Number(e.latlng.lat.toFixed(6)), Number(e.latlng.lng.toFixed(6))]);
+          redrawDraftPolygon();
+        });
+      } else {
+        geoEditorMap.invalidateSize();
+      }
+      redrawSavedGeofencesOnEditorMap();
+      renderGeofencesList();
+    }
+
+    function toggleGeofenceMapLayer() {
+      if (!geoEditorMap) return;
+      geoEditorSatellite = !geoEditorSatellite;
+      if (geoTileLayer) geoEditorMap.removeLayer(geoTileLayer);
+      geoTileLayer = L.tileLayer(
+        geoEditorSatellite
+          ? 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'
+          : 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
+      ).addTo(geoEditorMap);
+    }
+
+    function redrawDraftPolygon() {
+      if (!geoEditorMap) return;
+      if (draftPolygonLayer) geoEditorMap.removeLayer(draftPolygonLayer);
+      draftMarkers.forEach((m) => geoEditorMap.removeLayer(m));
+      draftMarkers = [];
+
+      const pts = state.draftPolygonPoints;
+      document.getElementById('draftPointsCount').textContent = `${pts.length} vértices`;
+
+      pts.forEach((pt, idx) => {
+        const marker = L.circleMarker(pt, {
+          radius: 6,
+          color: '#1d4ed8',
+          fillColor: '#ffffff',
+          fillOpacity: 1,
+          weight: 3
+        }).bindTooltip(`Punto ${idx + 1}`).addTo(geoEditorMap);
+        draftMarkers.push(marker);
+      });
+
+      if (pts.length >= 2) {
+        const color = document.getElementById('newGeoColor').value || '#2563eb';
+        draftPolygonLayer = L.polygon(pts, {
+          color,
+          fillColor: color,
+          fillOpacity: 0.25,
+          weight: 2.5,
+          dashArray: '5, 5'
+        }).addTo(geoEditorMap);
+      }
+    }
+
+    function undoLastPolygonPoint() {
+      state.draftPolygonPoints.pop();
+      redrawDraftPolygon();
+    }
+
+    function clearDraftPolygon() {
+      state.draftPolygonPoints = [];
+      redrawDraftPolygon();
+    }
+
+    function saveNewGeofencePolygon() {
+      const name = document.getElementById('newGeoName').value.trim();
+      const color = document.getElementById('newGeoColor').value || '#2563eb';
+      if (!name) {
+        alert('Ingresa un nombre para la geocerca (ej: Planta CER_YPE).');
+        return;
+      }
+      if (state.draftPolygonPoints.length < 3) {
+        alert('Haz clic en al menos 3 puntos sobre el mapa para formar un polígono.');
+        return;
+      }
+
+      state.geofences.push({
+        id: 'geo_' + Date.now(),
+        name,
+        color,
+        active: true,
+        points: [...state.draftPolygonPoints]
+      });
+
+      document.getElementById('newGeoName').value = '';
+      clearDraftPolygon();
+      persistGeofences();
+      redrawSavedGeofencesOnEditorMap();
+    }
+
+    function redrawSavedGeofencesOnEditorMap() {
+      if (!geoEditorMap) return;
+      savedGeoLayers.forEach((l) => geoEditorMap.removeLayer(l));
+      savedGeoLayers = [];
+
+      state.geofences.forEach((g) => {
+        if (!Array.isArray(g.points) || g.points.length < 3) return;
+        const poly = L.polygon(g.points, {
+          color: g.color || '#2563eb',
+          fillColor: g.color || '#2563eb',
+          fillOpacity: g.active !== false ? 0.22 : 0.05,
+          weight: g.active !== false ? 2.5 : 1
+        }).bindPopup(`<strong>${g.name}</strong><br/>${g.points.length} vértices`).addTo(geoEditorMap);
+        savedGeoLayers.push(poly);
+      });
+    }
+
+    function focusGeofenceOnMap(id) {
+      const g = state.geofences.find((x) => x.id === id);
+      if (!g || !geoEditorMap || !g.points?.length) return;
+      const bounds = L.latLngBounds(g.points);
+      geoEditorMap.fitBounds(bounds.pad(0.25));
+    }
+
+    function deleteGeofence(id) {
+      state.geofences = state.geofences.filter((x) => x.id !== id);
+      persistGeofences();
+      redrawSavedGeofencesOnEditorMap();
+    }
+
+    function renderGeofencesList() {
+      document.getElementById('savedGeoCountBadge').textContent = state.geofences.length;
+      document.getElementById('navBadgeGeocercas').textContent = state.geofences.length;
+      const container = document.getElementById('savedGeofencesList');
+
+      if (state.geofences.length === 0) {
+        container.innerHTML = `<div class="rounded-xl border border-dashed border-slate-200 p-4 text-center text-xs text-slate-400">
+          Aún no hay geocercas creadas. Haz clic en el mapa para dibujar un polígono.
+        </div>`;
+        return;
+      }
+
+      container.innerHTML = state.geofences.map((g) => `
+        <div class="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50/70 px-3.5 py-2.5 text-xs">
+          <div class="flex items-center gap-2.5">
+            <span class="h-3.5 w-3.5 rounded-full shrink-0" style="background:${g.color || '#2563eb'}"></span>
+            <div>
+              <p class="font-bold text-slate-800">${g.name}</p>
+              <p class="text-[10px] text-slate-400">${g.points.length} vértices poligonales</p>
+            </div>
+          </div>
+          <div class="flex items-center gap-1.5">
+            <button type="button" onclick="focusGeofenceOnMap('${g.id}')" class="rounded-lg bg-white border border-slate-200 px-2.5 py-1 text-[11px] font-bold text-blue-600 hover:bg-blue-50">Ver</button>
+            <button type="button" onclick="deleteGeofence('${g.id}')" class="rounded-lg bg-rose-50 px-2.5 py-1 text-[11px] font-bold text-rose-600 hover:bg-rose-100">Borrar</button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    // ==================== MODAL DE MAPA GPS DIRECTO ====================
+    let directModalMap = null;
+    let directModalLayers = [];
+
+    async function openDirectGpsModal(codInicio, codFim, chofer, macroName, startIso) {
+      const modal = document.getElementById('gpsMapModal');
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+
+      document.getElementById('gpsModalTitle').textContent = `Ubicación GPS · ${chofer}`;
+      document.getElementById('gpsModalSubtitle').textContent = `${macroName} · ${formatDateTime(startIso)}`;
+      document.getElementById('gpsModalInfoStrip').innerHTML = `<div class="col-span-3 text-center py-2 text-xs text-slate-400">Cargando coordenadas GPS...</div>`;
+
+      setTimeout(() => {
+        if (!directModalMap) {
+          directModalMap = L.map('directMarkingMap').setView([-25.4724, -57.5145], 14);
+          L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; OpenStreetMap'
+          }).addTo(directModalMap);
+        } else {
+          directModalMap.invalidateSize();
+        }
+      }, 50);
+
+      try {
+        const key = `${codInicio}-${codFim}`;
+        let det = state.gpsDetailsByKey[key] || state.gpsDetailsByKey[`${codInicio}-0`];
+        if (!det) {
+          const data = await PrologService.fetchGpsDetail(state.credentials.codUnidade, codInicio, codFim);
+          if (data && data.ok) {
+            det = data.detail;
+            state.gpsDetailsByKey[key] = det;
+            localStorage.setItem('prolog_gps_cache_v1', JSON.stringify(state.gpsDetailsByKey));
+            renderAllModules();
+          }
+        }
+
+        directModalLayers.forEach((l) => directModalMap && directModalMap.removeLayer(l));
+        directModalLayers = [];
+
+        // Dibujar todas las geocercas poligonales en el mapa directo
+        state.geofences.forEach((g) => {
+          if (g.points?.length >= 3 && directModalMap) {
+            const poly = L.polygon(g.points, {
+              color: g.color || '#2563eb',
+              fillColor: g.color || '#2563eb',
+              fillOpacity: 0.2,
+              weight: 2
+            }).bindTooltip(`Geocerca: ${g.name}`).addTo(directModalMap);
+            directModalLayers.push(poly);
+          }
+        });
+
+        const latIni = det?.marcacaoInicio?.localizacaoMarcacao?.latitude;
+        const lngIni = det?.marcacaoInicio?.localizacaoMarcacao?.longitude;
+        const latFim = det?.marcacaoFim?.localizacaoMarcacao?.latitude;
+        const lngFim = det?.marcacaoFim?.localizacaoMarcacao?.longitude;
+
+        const geoEval = evaluateGeofenceForPoint(latIni, lngIni);
+        const statusText = geoEval.hasGeofences
+          ? (geoEval.inside === false ? '❓ FUERA DE GEOCERCA' : `✓ Dentro de ${geoEval.matchedName}`)
+          : 'Coordenada verificada';
+
+        document.getElementById('gpsModalInfoStrip').innerHTML = `
+          <div class="saas-subcard p-3 text-xs">
+            <span class="text-[10px] font-bold uppercase text-slate-400">Coordenada Inicio</span>
+            <p class="mt-0.5 font-mono font-bold text-slate-800">${latIni && lngIni ? `${latIni}, ${lngIni}` : 'Sin GPS'}</p>
+          </div>
+          <div class="saas-subcard p-3 text-xs">
+            <span class="text-[10px] font-bold uppercase text-slate-400">Validación Geocerca</span>
+            <p class="mt-0.5 font-bold ${geoEval.inside === false ? 'text-amber-600' : 'text-emerald-600'}">${statusText}</p>
+          </div>
+          <div class="saas-subcard p-3 text-xs">
+            <span class="text-[10px] font-bold uppercase text-slate-400">Dispositivo / Fuente</span>
+            <p class="mt-0.5 font-semibold text-slate-700">${det?.marcacaoInicio?.marcaDevice || 'App Prolog'} (${det?.marcacaoInicio?.fonteDataHora || 'GPS'})</p>
+          </div>
+        `;
+
+        if (latIni && lngIni && directModalMap) {
+          document.getElementById('gpsExternalLink').href = `https://www.google.com/maps?q=${latIni},${lngIni}`;
+          const mIni = L.marker([Number(latIni), Number(lngIni)])
+            .bindPopup(`<strong>Inicio: ${chofer}</strong><br/>${formatDateTime(det?.marcacaoInicio?.dataHoraMarcacao || startIso)}<br/>${statusText}`)
+            .addTo(directModalMap)
+            .openPopup();
+          directModalLayers.push(mIni);
+          directModalMap.setView([Number(latIni), Number(lngIni)], 15);
+        }
+
+        if (latFim && lngFim && directModalMap) {
+          const mFim = L.marker([Number(latFim), Number(lngFim)])
+            .bindPopup(`<strong>Fin: ${chofer}</strong><br/>${formatDateTime(det?.marcacaoFim?.dataHoraMarcacao)}`)
+            .addTo(directModalMap);
+          directModalLayers.push(mFim);
+        }
+      } catch (e) {
+        document.getElementById('gpsModalInfoStrip').innerHTML = `<div class="col-span-3 text-rose-600 text-xs">${e.message}</div>`;
+      }
+    }
+
+    function closeGpsMapModal() {
+      const modal = document.getElementById('gpsMapModal');
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+    }
+
+    function renderAllModules() {
+      renderOpenShiftsModule();
+      renderInterjornadaModule();
+      renderWorkedDaysMatrix();
+      renderTurnosMatrix();
+      renderUsuariosModule();
+      renderRelatoriosView();
+    }
+
+    // ==================== INICIALIZACIÓN Y RELOJ EN VIVO ====================
+    window.addEventListener('DOMContentLoaded', () => {
+      const today = new Date();
+      const past7 = new Date();
+      past7.setDate(today.getDate() - 6);
+
+      const d1 = toIsoDate(past7);
+      const d2 = toIsoDate(today);
+      document.getElementById('matrixDateStart').value = d1;
+      document.getElementById('matrixDateEnd').value = d2;
+      document.getElementById('turnosDateStart').value = d1;
+      document.getElementById('turnosDateEnd').value = d2;
+      document.getElementById('repDateStart').value = d1;
+      document.getElementById('repDateEnd').value = d2;
+
+      if (state.loggedIn) {
+        enterDashboard();
+      }
+
+      // Actualizar contadores de duración en vivo cada segundo y auto-sincronizar cada 15s
+      setInterval(() => {
+        if (!state.loggedIn) return;
+
+        let needsThresholdReRender = false;
+        document.querySelectorAll('.live-duration-cell').forEach((el) => {
+          const st = el.getAttribute('data-start');
+          if (st) {
+            const sec = Math.max(0, Math.floor((Date.now() - new Date(st).getTime()) / 1000));
+            el.textContent = formatLiveSeconds(sec);
+            const prevLevel = el.getAttribute('data-level') || 'NORMAL';
+            const nextLevel = getOpenShiftStyleBySeconds(sec).level;
+            if (prevLevel !== nextLevel) {
+              needsThresholdReRender = true;
+            }
+          }
+        });
+        if (needsThresholdReRender) {
+          renderOpenShiftsModule();
+        }
+
+        state.countdown -= 1;
+        if (state.countdown <= 0) {
+          state.countdown = 15;
+          syncRealtimeData(false);
+        }
+        document.getElementById('syncCountdownLabel').textContent = `${state.countdown}s`;
+      }, 1000);
+    });
+  </script>
+</body>
+</html>
