@@ -933,6 +933,295 @@
   <!-- ========================================================================= -->
   <script>
     const API_BASE = 'http://localhost:3005';
+    const PROLOG_REMOTE_BASE = 'https://prologapp.com/prolog';
+
+    const PrologService = {
+      jwt: localStorage.getItem('prolog_cloud_jwt') || '',
+      cargosList: null,
+      cachedColabs: null,
+      userProfile: null,
+
+      async isBridgeAvailable() {
+        if (location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') return false;
+        try {
+          const ctrl = new AbortController();
+          const tid = setTimeout(() => ctrl.abort(), 1000);
+          const res = await fetch(`${API_BASE}/api/prolog/custom-drivers`, { signal: ctrl.signal });
+          clearTimeout(tid);
+          return res.ok;
+        } catch (e) {
+          return false;
+        }
+      },
+
+      async login(user, pass, codUnidade = 617) {
+        if (await this.isBridgeAvailable()) {
+          const res = await fetch(`${API_BASE}/api/prolog/login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ usuario: user, senha: pass, codUnidade })
+          });
+          const data = await res.json();
+          if (!res.ok || !data.ok) throw new Error(data.error || 'Credenciales inválidas en Prolog');
+          return data;
+        }
+
+        // Modo Nube Directo
+        const res = await fetch(`${PROLOG_REMOTE_BASE}/api/v3/auth`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ user, pass, loginByToken: false })
+        });
+        const data = await res.json();
+        if (!res.ok || !data.token) {
+          throw new Error(data.message || 'Credenciales incorrectas en Prolog');
+        }
+        this.jwt = data.token;
+        localStorage.setItem('prolog_cloud_jwt', this.jwt);
+
+        try {
+          const selfRes = await fetch(`${PROLOG_REMOTE_BASE}/api/v3/users/self`, {
+            headers: { 'Authorization': `Bearer ${this.jwt}` }
+          });
+          if (selfRes.ok) {
+            this.userProfile = await selfRes.json();
+          }
+        } catch (e) {}
+
+        return { ok: true, token: this.jwt, user: this.userProfile || { name: user } };
+      },
+
+      async ensureCloudToken(user, pass) {
+        if (!this.jwt && user && pass) {
+          await this.login(user, pass);
+        }
+      },
+
+      async sync(params) {
+        const { usuario, senha, codUnidade, datainicio, datafim, codTipoIntervalo, force } = params;
+
+        if (await this.isBridgeAvailable()) {
+          const res = await fetch(`${API_BASE}/api/prolog/sync`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(params)
+          });
+          return await res.json();
+        }
+
+        // Modo Nube Directo
+        await this.ensureCloudToken(usuario, senha);
+        const headers = {
+          'Authorization': `Bearer ${this.jwt}`,
+          'Accept': 'application/json'
+        };
+
+        if (!this.cargosList || !this.cachedColabs || force) {
+          const [colabsRes, cargosRes] = await Promise.all([
+            fetch(`${PROLOG_REMOTE_BASE}/v2/colaboradores/listagem?codUnidades=${codUnidade}&apenasAtivos=true`, { headers }),
+            fetch(`${PROLOG_REMOTE_BASE}/v2/cargos/todos/por-unidade?codUnidades=${codUnidade}`, { headers })
+          ]);
+          this.cachedColabs = colabsRes.ok ? await colabsRes.json() : [];
+          this.cargosList = cargosRes.ok ? await cargosRes.json() : [];
+        }
+
+        const cargoQuery = (this.cargosList || []).map(c => `codCargos=${c.codigo}`).join('&');
+
+        const epMarc = `${PROLOG_REMOTE_BASE}/v2/controle-jornada/marcacoes-por-data?codUnidade=${codUnidade}&dataInicial=${datainicio}&dataFinal=${datafim}${codTipoIntervalo && codTipoIntervalo !== 'TODOS' ? `&codTipoIntervalo=${codTipoIntervalo}` : ''}`;
+        const epViag = `${PROLOG_REMOTE_BASE}/v2/controle-jornada/acompanhamento-viagens/viagens-em-andamento?codUnidades=${codUnidade}&${cargoQuery}`;
+        const epDesc = `${PROLOG_REMOTE_BASE}/v2/controle-jornada/acompanhamento-viagens/colaboradores-em-descanso?codUnidades=${codUnidade}&${cargoQuery}`;
+
+        const [marcRes, viagRes, descRes] = await Promise.all([
+          fetch(epMarc, { headers }),
+          fetch(epViag, { headers }),
+          fetch(epDesc, { headers })
+        ]);
+
+        const rawMarc = marcRes.ok ? await marcRes.json() : [];
+        const rawViag = viagRes.ok ? await viagRes.json() : {};
+        const rawDesc = descRes.ok ? await descRes.json() : {};
+
+        let motoristas = (this.cachedColabs || []).filter(c => String(c.nomeFuncao || '').toUpperCase().includes('MOTORISTA'));
+        
+        const localCustom = localStorage.getItem('prolog_custom_drivers_v1');
+        if (localCustom) {
+          try {
+            const customArr = JSON.parse(localCustom);
+            const byCpf = {};
+            motoristas.forEach(m => { byCpf[cleanCpfStr(m.cpf)] = m; });
+            customArr.forEach(cm => {
+              const k = cleanCpfStr(cm.cpf);
+              if (cm.deleted) {
+                delete byCpf[k];
+              } else if (byCpf[k]) {
+                Object.assign(byCpf[k], cm, { editadoLocal: true });
+              } else {
+                byCpf[k] = Object.assign({}, cm, { creadoLocal: true });
+              }
+            });
+            motoristas = Object.values(byCpf);
+          } catch (e) {}
+        }
+
+        const motoristaCpfs = new Set(motoristas.map(m => cleanCpfStr(m.cpf)));
+        const motoristaNames = new Set(motoristas.map(m => String(m.nome).trim().toUpperCase()));
+
+        const filteredMarc = (Array.isArray(rawMarc) ? rawMarc : []).filter(m => {
+          const cpf = cleanCpfStr(m.cpfColaborador);
+          const nom = String(m.nomeColaborador || '').trim().toUpperCase();
+          return (cpf && motoristaCpfs.has(cpf)) || (nom && motoristaNames.has(nom));
+        });
+
+        const filteredViag = (rawViag.colaboradoresEmViagem || []).filter(v => {
+          const cpf = cleanCpfStr(v.cpfColaborador);
+          const nom = String(v.nomeColaborador || '').trim().toUpperCase();
+          return (cpf && motoristaCpfs.has(cpf)) || (nom && motoristaNames.has(nom));
+        });
+
+        const filteredDesc = (rawDesc.colaboradoresEmDescanso || []).filter(d => {
+          const cpf = cleanCpfStr(d.cpfColaborador);
+          const nom = String(d.nomeColaborador || '').trim().toUpperCase();
+          return (cpf && motoristaCpfs.has(cpf)) || (nom && motoristaNames.has(nom));
+        });
+
+        return {
+          ok: true,
+          colaboradores: motoristas,
+          marcacoes: filteredMarc,
+          viagensEmAndamento: filteredViag,
+          colaboradoresEmDescanso: filteredDesc,
+          user: this.userProfile || { name: usuario }
+        };
+      },
+
+      async fetchGpsDetail(codUnidade, codIni, codFim) {
+        if (await this.isBridgeAvailable()) {
+          const res = await fetch(`${API_BASE}/api/prolog/detail`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              usuario: state.credentials.usuario,
+              senha: state.credentials.senha,
+              codUnidade,
+              codInicio: codIni,
+              codFim
+            })
+          });
+          return await res.json();
+        }
+
+        await this.ensureCloudToken(state.credentials.usuario, state.credentials.senha);
+        const qs = [`codUnidade=${codUnidade}`];
+        if (codIni > 0) qs.push(`codInicio=${codIni}`);
+        if (codFim > 0) qs.push(`codFim=${codFim}`);
+        const res = await fetch(`${PROLOG_REMOTE_BASE}/v2/controle-jornada/acompanhamento-viagens/marcacao-inicio-fim?${qs.join('&')}`, {
+          headers: { 'Authorization': `Bearer ${this.jwt}` }
+        });
+        if (!res.ok) throw new Error('Detalle GPS no disponible');
+        const detail = await res.json();
+        return { ok: true, detail };
+      },
+
+      async fetchGpsBatch(items, codUnidade = 617) {
+        if (await this.isBridgeAvailable()) {
+          const res = await fetch(`${API_BASE}/api/prolog/details-batch`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              usuario: state.credentials.usuario,
+              senha: state.credentials.senha,
+              codUnidade,
+              items
+            })
+          });
+          return await res.json();
+        }
+
+        const details = {};
+        await Promise.all(items.slice(0, 30).map(async (it) => {
+          try {
+            const d = await this.fetchGpsDetail(codUnidade, it.codInicio, it.codFim);
+            if (d && d.ok && d.detail) {
+              details[`${it.codInicio}-${it.codFim}`] = d.detail;
+            }
+          } catch (e) {}
+        }));
+        return { ok: true, details };
+      },
+
+      async getGeofences() {
+        if (await this.isBridgeAvailable()) {
+          try {
+            const res = await fetch(`${API_BASE}/api/prolog/geofences`);
+            const data = await res.json();
+            if (res.ok && data.ok && Array.isArray(data.geofences) && data.geofences.length > 0) {
+              return data.geofences;
+            }
+          } catch (e) {}
+        }
+        const local = localStorage.getItem('prolog_geofences_v1');
+        if (local) {
+          try {
+            const parsed = JSON.parse(local);
+            if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+          } catch (e) {}
+        }
+        return [
+          {
+            id: "geo_cer_ype_01",
+            name: "Planta CER_YPE (Ypané)",
+            color: "#2563eb",
+            active: true,
+            points: [
+              [-25.43716, -57.51318],
+              [-25.43585, -57.50982],
+              [-25.44102, -57.50654],
+              [-25.44281, -57.51034]
+            ]
+          }
+        ];
+      },
+
+      async saveGeofences(geofences) {
+        localStorage.setItem('prolog_geofences_v1', JSON.stringify(geofences));
+        if (await this.isBridgeAvailable()) {
+          try {
+            await fetch(`${API_BASE}/api/prolog/geofences`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ geofences })
+            });
+          } catch (e) {}
+        }
+      },
+
+      async getCustomDrivers() {
+        if (await this.isBridgeAvailable()) {
+          try {
+            const res = await fetch(`${API_BASE}/api/prolog/custom-drivers`);
+            const data = await res.json();
+            if (res.ok && data.ok) return data.customDrivers;
+          } catch (e) {}
+        }
+        const local = localStorage.getItem('prolog_custom_drivers_v1');
+        return local ? JSON.parse(local) : [];
+      },
+
+      async saveCustomDrivers(customDrivers, driverToSave) {
+        localStorage.setItem('prolog_custom_drivers_v1', JSON.stringify(customDrivers));
+        if (await this.isBridgeAvailable()) {
+          try {
+            const res = await fetch(`${API_BASE}/api/prolog/custom-drivers`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ customDrivers, driverToSave })
+            });
+            return await res.json();
+          } catch (e) {}
+        }
+        return { ok: true };
+      }
+    };
 
     const state = {
       loggedIn: localStorage.getItem('prolog_logged_in') === 'true',
@@ -1056,13 +1345,8 @@
       btn.innerHTML = '<span>Autenticando en Prolog...</span>';
 
       try {
-        const res = await fetch(`${API_BASE}/api/prolog/login`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ usuario: user, senha: pass, codUnidade: 617 })
-        });
-        const data = await res.json();
-        if (!res.ok || !data.ok) throw new Error(data.error || 'Credenciales inválidas en Prolog');
+        const data = await PrologService.login(user, pass, 617);
+        if (!data || !data.ok) throw new Error(data?.error || 'Credenciales inválidas en Prolog');
 
         state.credentials.usuario = user;
         state.credentials.senha = pass;
@@ -1073,7 +1357,7 @@
 
         enterDashboard();
       } catch (err) {
-        errBox.textContent = err.message || 'No se pudo conectar al puente local.';
+        errBox.textContent = err.message || 'Error al autenticar en Prolog.';
         errBox.classList.remove('hidden');
       } finally {
         btn.disabled = false;
@@ -1160,21 +1444,16 @@
         const past7 = new Date(today);
         past7.setDate(past7.getDate() - 7);
 
-        const res = await fetch(`${API_BASE}/api/prolog/sync`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            usuario: state.credentials.usuario,
-            senha: state.credentials.senha,
-            codUnidade: state.credentials.codUnidade,
-            datainicio: toIsoDate(past7),
-            datafim: toIsoDate(today),
-            codTipoIntervalo: '444',
-            force
-          })
+        const data = await PrologService.sync({
+          usuario: state.credentials.usuario,
+          senha: state.credentials.senha,
+          codUnidade: state.credentials.codUnidade,
+          datainicio: toIsoDate(past7),
+          datafim: toIsoDate(today),
+          codTipoIntervalo: '444',
+          force
         });
-        const data = await res.json();
-        if (!res.ok || !data.ok) throw new Error(data.error || 'Error al sincronizar con Prolog');
+        if (!data || !data.ok) throw new Error(data?.error || 'Error al sincronizar con Prolog');
 
         state.motoristas = (Array.isArray(data.colaboradores) ? data.colaboradores : [])
           .filter((c) => String(c.nomeFuncao || 'MOTORISTA').toUpperCase().includes('MOTORISTA'));
@@ -1306,18 +1585,8 @@
       if (missingItems.length === 0) return;
 
       try {
-        const res = await fetch(`${API_BASE}/api/prolog/details-batch`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            usuario: state.credentials.usuario,
-            senha: state.credentials.senha,
-            codUnidade: state.credentials.codUnidade,
-            items: missingItems
-          })
-        });
-        const data = await res.json();
-        if (res.ok && data.ok && data.details) {
+        const data = await PrologService.fetchGpsBatch(missingItems, state.credentials.codUnidade);
+        if (data && data.ok && data.details) {
           Object.assign(state.gpsDetailsByKey, data.details);
           localStorage.setItem('prolog_gps_cache_v1', JSON.stringify(state.gpsDetailsByKey));
           renderOpenShiftsModule();
@@ -2122,11 +2391,7 @@
 
     async function loadCustomDriversFromServer() {
       try {
-        const res = await fetch(`${API_BASE}/api/prolog/custom-drivers`);
-        const data = await res.json();
-        if (res.ok && data.ok && Array.isArray(data.customDrivers)) {
-          state.customDrivers = data.customDrivers;
-        }
+        state.customDrivers = await PrologService.getCustomDrivers();
       } catch (e) {}
     }
 
@@ -2255,16 +2520,8 @@
       }
 
       try {
-        const res = await fetch(`${API_BASE}/api/prolog/custom-drivers`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            customDrivers: state.customDrivers,
-            driverToSave: entry
-          })
-        });
-        const data = await res.json();
-        if (res.ok && data.ok) {
+        const data = await PrologService.saveCustomDrivers(state.customDrivers, entry);
+        if (data && data.ok) {
           if (Array.isArray(data.colaboradores)) {
             state.motoristas = data.colaboradores;
           }
@@ -2393,27 +2650,20 @@
 
     async function fetchPeriodMarkings(d1, d2, macroType) {
       try {
-        // Estirar 7 días hacia atrás desde d1 para que al tocar un DL en los primeros días del rango
-        // siempre esté disponible el último Fin de Jornada anterior (ej. si 13/10 es DL, tener el fin del 12/10)
         const lookbackDate = new Date(d1 + 'T00:00:00');
         lookbackDate.setDate(lookbackDate.getDate() - 7);
         const queryStart = toIsoDate(lookbackDate);
 
-        const res = await fetch(`${API_BASE}/api/prolog/sync`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            usuario: state.credentials.usuario,
-            senha: state.credentials.senha,
-            codUnidade: state.credentials.codUnidade,
-            datainicio: queryStart,
-            datafim: d2,
-            codTipoIntervalo: macroType || 'TODOS',
-            exactDates: true
-          })
+        const data = await PrologService.sync({
+          usuario: state.credentials.usuario,
+          senha: state.credentials.senha,
+          codUnidade: state.credentials.codUnidade,
+          datainicio: queryStart,
+          datafim: d2,
+          codTipoIntervalo: macroType || 'TODOS',
+          exactDates: true
         });
-        const data = await res.json();
-        if (res.ok && data.ok) {
+        if (data && data.ok) {
           const allMarks = Array.isArray(data.marcacoes) ? data.marcacoes : [];
           state.historyMarcacoes = allMarks;
           state.periodMarcacoes = allMarks.filter((m) => {
@@ -2457,18 +2707,8 @@
         for (let i = 0; i < batchItems.length; i += chunkSize) {
           const slice = batchItems.slice(i, i + chunkSize);
           statusEl.textContent = `Verificando GPS (${Math.min(i + chunkSize, batchItems.length)}/${batchItems.length})...`;
-          const res = await fetch(`${API_BASE}/api/prolog/details-batch`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              usuario: state.credentials.usuario,
-              senha: state.credentials.senha,
-              codUnidade: state.credentials.codUnidade,
-              items: slice
-            })
-          });
-          const data = await res.json();
-          if (res.ok && data.ok && data.details) {
+          const data = await PrologService.fetchGpsBatch(slice, state.credentials.codUnidade);
+          if (data && data.ok && data.details) {
             Object.assign(state.gpsDetailsByKey, data.details);
           }
         }
@@ -2643,27 +2883,15 @@
 
     async function loadGeofencesFromServer() {
       try {
-        const res = await fetch(`${API_BASE}/api/prolog/geofences`);
-        const data = await res.json();
-        if (res.ok && data.ok && Array.isArray(data.geofences) && data.geofences.length > 0) {
-          state.geofences = data.geofences;
-          localStorage.setItem('prolog_geofences_v1', JSON.stringify(state.geofences));
-        }
+        state.geofences = await PrologService.getGeofences();
       } catch (e) {}
       renderGeofencesList();
     }
 
     async function persistGeofences() {
-      localStorage.setItem('prolog_geofences_v1', JSON.stringify(state.geofences));
       renderGeofencesList();
       renderAllModules();
-      try {
-        await fetch(`${API_BASE}/api/prolog/geofences`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ geofences: state.geofences })
-        });
-      } catch (e) {}
+      await PrologService.saveGeofences(state.geofences);
     }
 
     function initOrRefreshGeofenceEditorMap() {
@@ -2850,19 +3078,8 @@
         const key = `${codInicio}-${codFim}`;
         let det = state.gpsDetailsByKey[key] || state.gpsDetailsByKey[`${codInicio}-0`];
         if (!det) {
-          const res = await fetch(`${API_BASE}/api/prolog/detail`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              usuario: state.credentials.usuario,
-              senha: state.credentials.senha,
-              codUnidade: state.credentials.codUnidade,
-              codInicio,
-              codFim
-            })
-          });
-          const data = await res.json();
-          if (res.ok && data.ok) {
+          const data = await PrologService.fetchGpsDetail(state.credentials.codUnidade, codInicio, codFim);
+          if (data && data.ok) {
             det = data.detail;
             state.gpsDetailsByKey[key] = det;
             localStorage.setItem('prolog_gps_cache_v1', JSON.stringify(state.gpsDetailsByKey));
