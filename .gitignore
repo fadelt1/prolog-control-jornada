@@ -1,0 +1,16 @@
+# Credenciales y configuraciones locales privadas
+prolog-config.json
+.env
+.env.local
+
+# Archivos de log y temporales
+*.log
+debug-requests.log
+
+# Dependencias Node (si se compila frontend)
+node_modules/
+dist/
+
+# Archivos de sistema operativo
+Thumbs.db
+.DS_Store
