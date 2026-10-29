@@ -556,63 +556,9 @@
         </div>
 
         <!-- ===================================================================== -->
-        <!-- VISTA 3C: APARTADO DE USUARIOS (CHOFERES · VERIFICACIÓN Y GESTIÓN)    -->
+        <!-- VISTA 3C: APARTADO DE USUARIOS (CHOFERES)                             -->
         <!-- ===================================================================== -->
         <div id="module_USUARIOS" class="hidden space-y-6">
-
-          <!-- Tarjeta de Verificación de Permisos Prolog + KPIs de Usuarios -->
-          <div class="saas-card p-6 space-y-4">
-            <div class="flex flex-wrap items-center justify-between gap-4 border-b border-slate-100 pb-4">
-              <div>
-                <div class="flex items-center gap-2">
-                  <span class="inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500"></span>
-                  <h3 class="text-sm font-extrabold text-slate-900">Gestión de Usuarios (Motoristas) &amp; Estado de Permisos Prolog</h3>
-                </div>
-                <p class="mt-1 text-xs text-slate-500">
-                  Cuenta Prolog activa: <strong class="font-mono text-slate-800">00007097243 (MIGUEL PATIÑO CABRAL)</strong> · Rol: <strong class="text-blue-600">ACESSO FILIAL - TST/RH (ID 4634)</strong>
-                </p>
-              </div>
-
-              <div class="flex flex-wrap items-center gap-2.5">
-                <button type="button" onclick="exportUsuariosExcel()"
-                  class="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-bold text-slate-700 shadow-sm hover:bg-slate-50">
-                  <span>Exportar Choferes (.xlsx)</span>
-                </button>
-                <button type="button" onclick="openDriverModal()"
-                  class="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-xs font-bold text-white shadow-md shadow-blue-600/20 transition hover:bg-blue-700">
-                  <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
-                  <span>Agregar Nuevo Chofer</span>
-                </button>
-              </div>
-            </div>
-
-            <!-- Resultado de Verificación de Permisos en Prolog API -->
-            <div class="grid grid-cols-1 gap-4 lg:grid-cols-3">
-              <div class="saas-subcard p-4 flex items-start gap-3">
-                <span class="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700 font-bold text-xs">✓</span>
-                <div>
-                  <p class="text-xs font-extrabold text-slate-800">Visualizar Choferes (Permiso 316)</p>
-                  <p class="mt-0.5 text-[11px] text-slate-500">Habilitado en Prolog (<code class="font-mono text-emerald-700">Colaboradores.VISUALIZAR = 316</code>). Sincroniza en vivo los <strong id="usrCountTotalBadge">80</strong> motoristas activos de CER_YPE.</p>
-                </div>
-              </div>
-
-              <div class="saas-subcard p-4 flex items-start gap-3">
-                <span class="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-700 font-bold text-xs">!</span>
-                <div>
-                  <p class="text-xs font-extrabold text-slate-800">Permisos en Servidor Prolog (310 / 325)</p>
-                  <p class="mt-0.5 text-[11px] text-slate-500">El rol <strong class="text-slate-700">ACESSO FILIAL - TST/RH</strong> no incluye <code class="font-mono">CADASTRAR (310)</code> ni <code class="font-mono">ALTERAR (325)</code> directamente en la base matriz de Prolog.</p>
-                </div>
-              </div>
-
-              <div class="saas-subcard p-4 flex items-start gap-3 border-blue-200 bg-blue-50/40">
-                <span class="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-white font-bold text-xs">★</span>
-                <div>
-                  <p class="text-xs font-extrabold text-blue-900">Edición y Alta Local Habilitada</p>
-                  <p class="mt-0.5 text-[11px] text-blue-800/80">Puedes <strong>editar cualquier chofer</strong> o <strong>agregar nuevos motoristas</strong> aquí. Se guardan localmente en el puente y se integran en todos los paneles.</p>
-                </div>
-              </div>
-            </div>
-          </div>
 
           <!-- Tabla de Usuarios (Choferes) -->
           <div class="saas-card overflow-hidden">
@@ -620,6 +566,14 @@
               <div class="flex items-center gap-3">
                 <h3 class="text-sm font-extrabold text-slate-800">Directorio de Usuarios · Función: MOTORISTA</h3>
                 <span id="usuariosTableCount" class="rounded-full bg-blue-50 px-3 py-0.5 font-mono text-xs font-bold text-blue-600">80 choferes</span>
+              </div>
+
+              <div>
+                <button type="button" onclick="exportUsuariosExcel()"
+                  class="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-xs font-bold text-white shadow-md shadow-blue-600/20 transition hover:bg-blue-700">
+                  <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                  <span>Exportar Choferes (.xlsx)</span>
+                </button>
               </div>
             </div>
 
@@ -2404,7 +2358,8 @@
 
       const totalCount = state.motoristas.length;
       document.getElementById('navBadgeUsuarios').textContent = totalCount;
-      document.getElementById('usrCountTotalBadge').textContent = totalCount;
+      const usrCountBadge = document.getElementById('usrCountTotalBadge');
+      if (usrCountBadge) usrCountBadge.textContent = totalCount;
       document.getElementById('usuariosTableCount').textContent = `${sorted.length} choferes`;
 
       const tbody = document.getElementById('usuariosTbody');
