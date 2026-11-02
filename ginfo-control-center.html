@@ -469,15 +469,26 @@
             </div>
 
             <div class="flex flex-wrap items-center gap-3">
+              <!-- Contador y Limpiar Filtros -->
+              <div class="flex items-center gap-2">
+                <span id="matrixFilterSummary" class="rounded-lg bg-blue-50 px-2.5 py-1.5 font-mono text-xs font-bold text-blue-700">80 choferes</span>
+                <button id="matrixClearFiltersBtn" type="button" onclick="resetMatrixFilters()"
+                  class="hidden inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-bold text-rose-700 hover:bg-rose-100 transition shadow-sm">
+                  <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                  <span>Limpiar Filtros</span>
+                </button>
+              </div>
+
               <div class="flex flex-wrap items-center gap-2 text-xs">
                 <span class="inline-flex h-6 w-7 items-center justify-center rounded-md bg-emerald-100 font-mono font-extrabold text-emerald-700">P</span>
-                <span class="font-semibold text-slate-500">= Presente (Tocar para ver Inicio/Fin y Total)</span>
+                <span class="font-semibold text-slate-500">= Presente</span>
                 <span class="inline-flex h-6 w-7 items-center justify-center rounded-md bg-slate-100 font-mono font-bold text-slate-400">DL</span>
-                <span class="font-semibold text-slate-500">= Día Libre (Tocar para ver Último Fin e Interjornada)</span>
+                <span class="font-semibold text-slate-500">= Día Libre</span>
               </div>
 
               <button type="button" onclick="exportMatrixExcel()"
-                class="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-emerald-700">
+                class="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-emerald-700 transition">
+                <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                 <span>Descargar Matriz Excel (.xlsx)</span>
               </button>
             </div>
@@ -1206,6 +1217,14 @@
       // Geocercas Poligonales: [{ id, name, color, active, points: [[lat,lng], ...] }]
       geofences: JSON.parse(localStorage.getItem('prolog_geofences_v1') || '[]'),
       draftPolygonPoints: [],
+
+      // Filtros de la Matriz de Días Trabajados
+      matrixFilters: {
+        driverName: '',
+        dateFilters: {},
+        totalP: '',
+        totalDL: ''
+      },
 
       countdown: 15,
       isSyncing: false
@@ -2011,7 +2030,115 @@
       return 'NOCHE';
     }
 
-    function renderWorkedDaysMatrix() {
+    // ==================== MÓDULO 3: MATRIZ DE DÍAS TRABAJADOS (P / DL) CON FILTROS ====================
+    function hasActiveMatrixFilters() {
+      if (state.matrixFilters.driverName && state.matrixFilters.driverName.trim()) return true;
+      if (state.matrixFilters.totalP) return true;
+      if (state.matrixFilters.totalDL) return true;
+      for (const k in state.matrixFilters.dateFilters) {
+        if (state.matrixFilters.dateFilters[k]) return true;
+      }
+      return false;
+    }
+
+    function resetMatrixFilters() {
+      state.matrixFilters.driverName = '';
+      state.matrixFilters.dateFilters = {};
+      state.matrixFilters.totalP = '';
+      state.matrixFilters.totalDL = '';
+      renderWorkedDaysMatrix(true);
+    }
+
+    function onMatrixFilterChange(field, val) {
+      if (field === 'driverName') {
+        state.matrixFilters.driverName = val;
+        renderWorkedDaysMatrix(false);
+      } else if (field.startsWith('date_')) {
+        const dt = field.slice(5);
+        if (val) {
+          state.matrixFilters.dateFilters[dt] = val;
+        } else {
+          delete state.matrixFilters.dateFilters[dt];
+        }
+        renderWorkedDaysMatrix(false);
+        const sel = document.getElementById(`filterSelect_${dt}`);
+        if (sel) sel.className = getMatrixFilterSelectClass(val);
+      } else if (field === 'totalP') {
+        state.matrixFilters.totalP = val;
+        renderWorkedDaysMatrix(false);
+        const sel = document.getElementById('matrixFilterTotalP');
+        if (sel) sel.className = getMatrixTotalPSelectClass(val);
+      } else if (field === 'totalDL') {
+        state.matrixFilters.totalDL = val;
+        renderWorkedDaysMatrix(false);
+        const sel = document.getElementById('matrixFilterTotalDL');
+        if (sel) sel.className = getMatrixTotalDLSelectClass(val);
+      }
+    }
+
+    function getMatrixFilterSelectClass(val) {
+      if (val === 'P') {
+        return 'w-full min-w-[50px] rounded-md border border-emerald-500 bg-emerald-50 text-emerald-800 text-[10px] font-extrabold py-0.5 px-1 focus:outline-none focus:ring-1 focus:ring-emerald-500 transition cursor-pointer shadow-sm';
+      }
+      if (val === 'DL') {
+        return 'w-full min-w-[50px] rounded-md border border-slate-500 bg-slate-200 text-slate-800 text-[10px] font-extrabold py-0.5 px-1 focus:outline-none focus:ring-1 focus:ring-slate-500 transition cursor-pointer shadow-sm';
+      }
+      return 'w-full min-w-[50px] rounded-md border border-slate-300 bg-white text-slate-600 text-[10px] font-medium py-0.5 px-1 focus:outline-none focus:ring-1 focus:ring-blue-500 transition cursor-pointer';
+    }
+
+    function getMatrixTotalPSelectClass(val) {
+      if (val) {
+        return 'w-full min-w-[62px] rounded-md border border-emerald-600 bg-emerald-100 text-emerald-900 text-[10px] font-extrabold py-0.5 px-1 focus:outline-none focus:ring-1 focus:ring-emerald-500 transition cursor-pointer shadow-sm';
+      }
+      return 'w-full min-w-[62px] rounded-md border border-slate-300 bg-white text-slate-600 text-[10px] font-medium py-0.5 px-1 focus:outline-none focus:ring-1 focus:ring-emerald-500 transition cursor-pointer';
+    }
+
+    function getMatrixTotalDLSelectClass(val) {
+      if (val) {
+        return 'w-full min-w-[62px] rounded-md border border-slate-600 bg-slate-200 text-slate-900 text-[10px] font-extrabold py-0.5 px-1 focus:outline-none focus:ring-1 focus:ring-slate-500 transition cursor-pointer shadow-sm';
+      }
+      return 'w-full min-w-[62px] rounded-md border border-slate-300 bg-white text-slate-600 text-[10px] font-medium py-0.5 px-1 focus:outline-none focus:ring-1 focus:ring-slate-500 transition cursor-pointer';
+    }
+
+    function matchesTotalFilter(count, filterVal) {
+      if (!filterVal) return true;
+      if (filterVal === '=0') return count === 0;
+      if (filterVal === '>0') return count > 0;
+      if (filterVal.startsWith('=')) {
+        return count === parseInt(filterVal.slice(1), 10);
+      }
+      if (filterVal.startsWith('>=')) {
+        return count >= parseInt(filterVal.slice(2), 10);
+      }
+      if (filterVal.startsWith('<=')) {
+        return count <= parseInt(filterVal.slice(2), 10);
+      }
+      return true;
+    }
+
+    function updateMatrixFilterToolbar(visibleCount, totalCount) {
+      const summaryEl = document.getElementById('matrixFilterSummary');
+      const clearBtn = document.getElementById('matrixClearFiltersBtn');
+      const isFiltered = hasActiveMatrixFilters();
+      if (summaryEl && visibleCount !== undefined) {
+        if (isFiltered) {
+          summaryEl.textContent = `${visibleCount} de ${totalCount} choferes`;
+          summaryEl.className = 'rounded-lg bg-amber-50 border border-amber-200 px-2.5 py-1.5 font-mono text-xs font-extrabold text-amber-800 shadow-sm';
+        } else {
+          summaryEl.textContent = `${totalCount} choferes`;
+          summaryEl.className = 'rounded-lg bg-blue-50 px-2.5 py-1.5 font-mono text-xs font-bold text-blue-700';
+        }
+      }
+      if (clearBtn) {
+        if (isFiltered) {
+          clearBtn.classList.remove('hidden');
+        } else {
+          clearBtn.classList.add('hidden');
+        }
+      }
+    }
+
+    function renderWorkedDaysMatrix(rebuildThead = false) {
       const d1 = document.getElementById('matrixDateStart').value;
       const d2 = document.getElementById('matrixDateEnd').value;
       if (!d1 || !d2) return;
@@ -2021,57 +2148,188 @@
       const tbody = document.getElementById('matrixTbody');
       const shiftIndex = buildShiftsByDriverDateMap();
 
-      thead.innerHTML = `
-        <tr>
-          <th class="sticky left-0 z-10 bg-slate-50 py-3.5 pl-6 pr-4 font-extrabold text-slate-700 border-r border-slate-200">Chofer</th>
-          ${dates.map((dt) => {
-            const [, mm, dd] = dt.split('-');
-            return `<th class="px-2.5 py-3.5 text-center font-mono">${dd}/${mm}</th>`;
-          }).join('')}
-          <th class="px-3 py-3.5 text-center font-extrabold text-emerald-700 bg-emerald-50/60">Total P</th>
-          <th class="px-3 py-3.5 text-center font-extrabold text-slate-500 bg-slate-100/70">Total DL</th>
-        </tr>
-      `;
+      const shouldBuildThead = rebuildThead || thead.children.length === 0;
 
-      const q = normalizeText(state.searchQuery);
-      const sortedDrivers = [...state.motoristas]
-        .filter((m) => !q || normalizeText(m.nome).includes(q) || cleanCpfStr(m.cpf).includes(q))
-        .sort((a, b) => a.nome.localeCompare(b.nome));
-
-      tbody.innerHTML = sortedDrivers.map((c) => {
-        const cCpf = cleanCpfStr(c.cpf);
-        const cName = normalizeText(c.nome);
-        let pCount = 0;
-        let dlCount = 0;
-
-        const cellsHtml = dates.map((dt) => {
-          const shifts = shiftIndex.getShifts(cCpf, cName, dt);
-          if (shifts.length > 0) {
-            pCount++;
-            return `<td class="px-1.5 py-2.5 text-center">
-              <button type="button" onclick="openCellDetailModal('P', '${cCpf}', '${dt}')"
-                title="Clic para ver Inicio, Fin y Tiempo Total de Jornada"
-                class="inline-flex h-6 w-7 cursor-pointer items-center justify-center rounded-md bg-emerald-100 font-mono text-[11px] font-extrabold text-emerald-700 shadow-sm transition hover:scale-110 hover:bg-emerald-600 hover:text-white">P</button>
-            </td>`;
-          } else {
-            dlCount++;
-            return `<td class="px-1.5 py-2.5 text-center">
-              <button type="button" onclick="openCellDetailModal('DL', '${cCpf}', '${dt}')"
-                title="Clic para ver Último Fin de Jornada y Horas de Interjornada"
-                class="inline-flex h-6 w-7 cursor-pointer items-center justify-center rounded-md bg-slate-100 font-mono text-[11px] font-semibold text-slate-500 transition hover:scale-110 hover:bg-slate-700 hover:text-white">DL</button>
-            </td>`;
-          }
-        }).join('');
-
-        return `
-          <tr class="hover:bg-blue-50/30">
-            <td class="sticky left-0 z-10 bg-white py-2.5 pl-6 pr-4 font-bold text-slate-800 whitespace-nowrap border-r border-slate-100">${c.nome.toUpperCase()}</td>
-            ${cellsHtml}
-            <td class="px-3 py-2.5 text-center font-mono font-extrabold text-emerald-700 bg-emerald-50/30">${pCount}</td>
-            <td class="px-3 py-2.5 text-center font-mono font-bold text-slate-500 bg-slate-50">${dlCount}</td>
+      if (shouldBuildThead) {
+        thead.innerHTML = `
+          <tr class="border-b border-slate-200 bg-slate-50 text-[11px] font-bold uppercase text-slate-500">
+            <th class="sticky left-0 z-20 bg-slate-50 py-3 pl-6 pr-4 font-extrabold text-slate-700 border-r border-slate-200">Chofer</th>
+            ${dates.map((dt) => {
+              const [, mm, dd] = dt.split('-');
+              return `<th class="px-2 py-3 text-center font-mono">${dd}/${mm}</th>`;
+            }).join('')}
+            <th class="px-3 py-3 text-center font-extrabold text-emerald-700 bg-emerald-50/70 border-l border-slate-200">Total P</th>
+            <th class="px-3 py-3 text-center font-extrabold text-slate-500 bg-slate-100/70 border-l border-slate-200">Total DL</th>
+          </tr>
+          <tr id="matrixFilterRow" class="border-b border-slate-200 bg-slate-100/90 text-[11px]">
+            <th class="sticky left-0 z-20 bg-slate-100 p-1.5 border-r border-slate-200">
+              <input type="text" id="matrixFilterDriverName"
+                oninput="onMatrixFilterChange('driverName', this.value)"
+                placeholder="Filtrar chofer..."
+                value="${state.matrixFilters.driverName ? state.matrixFilters.driverName.replace(/"/g, '&quot;') : ''}"
+                class="w-full rounded-md border border-slate-300 bg-white px-2 py-1 text-xs font-normal text-slate-800 placeholder-slate-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500" />
+            </th>
+            ${dates.map((dt) => {
+              const currentVal = state.matrixFilters.dateFilters[dt] || '';
+              return `
+                <th class="p-1 text-center bg-slate-100">
+                  <select id="filterSelect_${dt}" onchange="onMatrixFilterChange('date_${dt}', this.value)"
+                    class="${getMatrixFilterSelectClass(currentVal)}">
+                    <option value="">Todo</option>
+                    <option value="P" ${currentVal === 'P' ? 'selected' : ''}>P</option>
+                    <option value="DL" ${currentVal === 'DL' ? 'selected' : ''}>DL</option>
+                  </select>
+                </th>
+              `;
+            }).join('')}
+            <th class="p-1 text-center bg-emerald-50/50 border-l border-slate-200">
+              <select id="matrixFilterTotalP" onchange="onMatrixFilterChange('totalP', this.value)"
+                class="${getMatrixTotalPSelectClass(state.matrixFilters.totalP)}">
+                <option value="">Todo</option>
+                <option value=">0" ${state.matrixFilters.totalP === '>0' ? 'selected' : ''}>P &gt; 0</option>
+                <option value="=0" ${state.matrixFilters.totalP === '=0' ? 'selected' : ''}>P = 0</option>
+                <option value="=1" ${state.matrixFilters.totalP === '=1' ? 'selected' : ''}>P = 1</option>
+                <option value="=2" ${state.matrixFilters.totalP === '=2' ? 'selected' : ''}>P = 2</option>
+                <option value="=3" ${state.matrixFilters.totalP === '=3' ? 'selected' : ''}>P = 3</option>
+                <option value="=4" ${state.matrixFilters.totalP === '=4' ? 'selected' : ''}>P = 4</option>
+                <option value="=5" ${state.matrixFilters.totalP === '=5' ? 'selected' : ''}>P = 5</option>
+                <option value=">=1" ${state.matrixFilters.totalP === '>=1' ? 'selected' : ''}>P &ge; 1</option>
+                <option value=">=2" ${state.matrixFilters.totalP === '>=2' ? 'selected' : ''}>P &ge; 2</option>
+                <option value=">=3" ${state.matrixFilters.totalP === '>=3' ? 'selected' : ''}>P &ge; 3</option>
+                <option value=">=4" ${state.matrixFilters.totalP === '>=4' ? 'selected' : ''}>P &ge; 4</option>
+                <option value=">=5" ${state.matrixFilters.totalP === '>=5' ? 'selected' : ''}>P &ge; 5</option>
+                <option value=">=6" ${state.matrixFilters.totalP === '>=6' ? 'selected' : ''}>P &ge; 6</option>
+                <option value=">=7" ${state.matrixFilters.totalP === '>=7' ? 'selected' : ''}>P &ge; 7</option>
+                <option value=">=10" ${state.matrixFilters.totalP === '>=10' ? 'selected' : ''}>P &ge; 10</option>
+                <option value=">=15" ${state.matrixFilters.totalP === '>=15' ? 'selected' : ''}>P &ge; 15</option>
+              </select>
+            </th>
+            <th class="p-1 text-center bg-slate-200/50 border-l border-slate-200">
+              <select id="matrixFilterTotalDL" onchange="onMatrixFilterChange('totalDL', this.value)"
+                class="${getMatrixTotalDLSelectClass(state.matrixFilters.totalDL)}">
+                <option value="">Todo</option>
+                <option value=">0" ${state.matrixFilters.totalDL === '>0' ? 'selected' : ''}>DL &gt; 0</option>
+                <option value="=0" ${state.matrixFilters.totalDL === '=0' ? 'selected' : ''}>DL = 0</option>
+                <option value="=1" ${state.matrixFilters.totalDL === '=1' ? 'selected' : ''}>DL = 1</option>
+                <option value="=2" ${state.matrixFilters.totalDL === '=2' ? 'selected' : ''}>DL = 2</option>
+                <option value="=3" ${state.matrixFilters.totalDL === '=3' ? 'selected' : ''}>DL = 3</option>
+                <option value="=4" ${state.matrixFilters.totalDL === '=4' ? 'selected' : ''}>DL = 4</option>
+                <option value="=5" ${state.matrixFilters.totalDL === '=5' ? 'selected' : ''}>DL = 5</option>
+                <option value=">=1" ${state.matrixFilters.totalDL === '>=1' ? 'selected' : ''}>DL &ge; 1</option>
+                <option value=">=2" ${state.matrixFilters.totalDL === '>=2' ? 'selected' : ''}>DL &ge; 2</option>
+                <option value=">=3" ${state.matrixFilters.totalDL === '>=3' ? 'selected' : ''}>DL &ge; 3</option>
+                <option value=">=4" ${state.matrixFilters.totalDL === '>=4' ? 'selected' : ''}>DL &ge; 4</option>
+                <option value=">=5" ${state.matrixFilters.totalDL === '>=5' ? 'selected' : ''}>DL &ge; 5</option>
+                <option value=">=7" ${state.matrixFilters.totalDL === '>=7' ? 'selected' : ''}>DL &ge; 7</option>
+                <option value=">=10" ${state.matrixFilters.totalDL === '>=10' ? 'selected' : ''}>DL &ge; 10</option>
+              </select>
+            </th>
           </tr>
         `;
-      }).join('');
+      }
+
+      const globalQ = normalizeText(state.searchQuery);
+      const nameQ = normalizeText(state.matrixFilters.driverName || '');
+      const allSorted = [...state.motoristas].sort((a, b) => a.nome.localeCompare(b.nome));
+
+      const filteredRows = [];
+
+      for (const c of allSorted) {
+        const cCpf = cleanCpfStr(c.cpf);
+        const cName = normalizeText(c.nome);
+
+        // Global search filter
+        if (globalQ && !cName.includes(globalQ) && !cCpf.includes(globalQ)) {
+          continue;
+        }
+
+        // Driver name column filter
+        if (nameQ && !cName.includes(nameQ) && !cCpf.includes(nameQ)) {
+          continue;
+        }
+
+        let pCount = 0;
+        let dlCount = 0;
+        const dayStatus = {};
+        const cellItems = [];
+
+        for (const dt of dates) {
+          const shifts = shiftIndex.getShifts(cCpf, cName, dt);
+          const hasShift = shifts.length > 0;
+          const status = hasShift ? 'P' : 'DL';
+          dayStatus[dt] = status;
+          if (hasShift) {
+            pCount++;
+            cellItems.push({
+              status: 'P',
+              html: `<td class="px-1.5 py-2.5 text-center">
+                <button type="button" onclick="openCellDetailModal('P', '${cCpf}', '${dt}')"
+                  title="Clic para ver Inicio, Fin y Tiempo Total de Jornada"
+                  class="inline-flex h-6 w-7 cursor-pointer items-center justify-center rounded-md bg-emerald-100 font-mono text-[11px] font-extrabold text-emerald-700 shadow-sm transition hover:scale-110 hover:bg-emerald-600 hover:text-white">P</button>
+              </td>`
+            });
+          } else {
+            dlCount++;
+            cellItems.push({
+              status: 'DL',
+              html: `<td class="px-1.5 py-2.5 text-center">
+                <button type="button" onclick="openCellDetailModal('DL', '${cCpf}', '${dt}')"
+                  title="Clic para ver Último Fin de Jornada y Horas de Interjornada"
+                  class="inline-flex h-6 w-7 cursor-pointer items-center justify-center rounded-md bg-slate-100 font-mono text-[11px] font-semibold text-slate-500 transition hover:scale-110 hover:bg-slate-700 hover:text-white">DL</button>
+              </td>`
+            });
+          }
+        }
+
+        // Date column filters
+        let dateFilterMatch = true;
+        for (const dt of dates) {
+          const reqStatus = state.matrixFilters.dateFilters[dt];
+          if (reqStatus && dayStatus[dt] !== reqStatus) {
+            dateFilterMatch = false;
+            break;
+          }
+        }
+        if (!dateFilterMatch) continue;
+
+        // Total P filter
+        if (!matchesTotalFilter(pCount, state.matrixFilters.totalP)) continue;
+
+        // Total DL filter
+        if (!matchesTotalFilter(dlCount, state.matrixFilters.totalDL)) continue;
+
+        filteredRows.push({
+          driver: c,
+          cellItems,
+          pCount,
+          dlCount
+        });
+      }
+
+      updateMatrixFilterToolbar(filteredRows.length, allSorted.length);
+
+      if (filteredRows.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="${dates.length + 3}" class="py-12 text-center text-slate-400">
+              <p class="font-semibold text-sm text-slate-500">No se encontraron choferes con los filtros seleccionados.</p>
+              <button type="button" onclick="resetMatrixFilters()" class="mt-2.5 inline-flex items-center gap-1.5 rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-700 hover:bg-blue-100 transition shadow-sm">
+                <span>✕ Limpiar todos los filtros</span>
+              </button>
+            </td>
+          </tr>
+        `;
+        return;
+      }
+
+      tbody.innerHTML = filteredRows.map(({ driver: c, cellItems, pCount, dlCount }) => `
+        <tr class="hover:bg-blue-50/30">
+          <td class="sticky left-0 z-10 bg-white py-2.5 pl-6 pr-4 font-bold text-slate-800 whitespace-nowrap border-r border-slate-100">${c.nome.toUpperCase()}</td>
+          ${cellItems.map(ci => ci.html).join('')}
+          <td class="px-3 py-2.5 text-center font-mono font-extrabold text-emerald-700 bg-emerald-50/30 border-l border-slate-100">${pCount}</td>
+          <td class="px-3 py-2.5 text-center font-mono font-bold text-slate-500 bg-slate-50 border-l border-slate-100">${dlCount}</td>
+        </tr>
+      `).join('');
     }
 
     // ==================== MÓDULO 3B: MATRIZ DE CONTROL DE TURNOS (MAÑANA / TARDE / NOCHE) ====================
@@ -2528,30 +2786,57 @@
       const d1 = document.getElementById('matrixDateStart').value;
       const d2 = document.getElementById('matrixDateEnd').value;
       const dates = getDatesArrayBetween(d1, d2);
+      const shiftIndex = buildShiftsByDriverDateMap();
 
-      const workedSet = new Set();
-      [...state.periodMarcacoes, ...state.marcacoesRecientes].forEach((m) => {
-        if (!m.dataMarcacaoInicio) return;
-        const dt = String(m.dataMarcacaoInicio).slice(0, 10);
-        workedSet.add(`${cleanCpfStr(m.cpfColaborador)}|${dt}`);
-        workedSet.add(`${normalizeText(m.nomeColaborador)}|${dt}`);
-      });
+      const globalQ = normalizeText(state.searchQuery);
+      const nameQ = normalizeText(state.matrixFilters.driverName || '');
+      const allSorted = [...state.motoristas].sort((a, b) => a.nome.localeCompare(b.nome));
 
       const header = ['CHOFER', ...dates.map((d) => `${d.slice(8, 10)}/${d.slice(5, 7)}`), 'TOTAL P', 'TOTAL DL'];
-      const aoa = [['MATRIZ DE DÍAS TRABAJADOS (P = PRESENTE / DL = DÍA LIBRE)'], [], header];
+      const aoa = [['MATRIZ DE DÍAS TRABAJADOS (P = PRESENTE / DL = DÍA LIBRE)']];
+      if (hasActiveMatrixFilters()) {
+        aoa.push(['* Reporte con filtros activos aplicados']);
+      }
+      aoa.push([]);
+      aoa.push(header);
 
-      const sortedDrivers = [...state.motoristas].sort((a, b) => a.nome.localeCompare(b.nome));
-      sortedDrivers.forEach((c) => {
+      allSorted.forEach((c) => {
         const cCpf = cleanCpfStr(c.cpf);
         const cName = normalizeText(c.nome);
-        let p = 0, dl = 0;
-        const row = [c.nome.toUpperCase()];
-        dates.forEach((dt) => {
-          const has = workedSet.has(`${cCpf}|${dt}`) || workedSet.has(`${cName}|${dt}`);
-          if (has) { p++; row.push('P'); } else { dl++; row.push('DL'); }
-        });
-        row.push(p, dl);
-        aoa.push(row);
+
+        if (globalQ && !cName.includes(globalQ) && !cCpf.includes(globalQ)) return;
+        if (nameQ && !cName.includes(nameQ) && !cCpf.includes(nameQ)) return;
+
+        let pCount = 0;
+        let dlCount = 0;
+        const dayStatus = {};
+        const rowVals = [];
+
+        for (const dt of dates) {
+          const shifts = shiftIndex.getShifts(cCpf, cName, dt);
+          const has = shifts.length > 0;
+          const status = has ? 'P' : 'DL';
+          dayStatus[dt] = status;
+          if (has) {
+            pCount++;
+            rowVals.push('P');
+          } else {
+            dlCount++;
+            rowVals.push('DL');
+          }
+        }
+
+        // Date column filters
+        for (const dt of dates) {
+          const req = state.matrixFilters.dateFilters[dt];
+          if (req && dayStatus[dt] !== req) return;
+        }
+
+        // Total P / DL filters
+        if (!matchesTotalFilter(pCount, state.matrixFilters.totalP)) return;
+        if (!matchesTotalFilter(dlCount, state.matrixFilters.totalDL)) return;
+
+        aoa.push([c.nome.toUpperCase(), ...rowVals, pCount, dlCount]);
       });
 
       const wb = XLSX.utils.book_new();
@@ -2625,7 +2910,7 @@
             const dt = String(m.dataMarcacaoInicio || '').slice(0, 10);
             return dt >= d1 && dt <= d2;
           });
-          renderWorkedDaysMatrix();
+          renderWorkedDaysMatrix(true);
           renderTurnosMatrix();
           renderRelatoriosView();
         }
