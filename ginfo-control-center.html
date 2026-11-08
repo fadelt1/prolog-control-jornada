@@ -482,6 +482,8 @@
               <div class="flex flex-wrap items-center gap-2 text-xs">
                 <span class="inline-flex h-6 w-7 items-center justify-center rounded-md bg-emerald-100 font-mono font-extrabold text-emerald-700">P</span>
                 <span class="font-semibold text-slate-500">= Presente</span>
+                <span class="inline-flex h-6 w-7 items-center justify-center rounded-md bg-orange-500 font-mono text-[11px] font-black text-white shadow-sm">P</span>
+                <span class="font-semibold text-slate-500">= Fin Jornada ≥ 06:00 hs</span>
                 <span class="inline-flex h-6 w-7 items-center justify-center rounded-md bg-slate-100 font-mono font-bold text-slate-400">DL</span>
                 <span class="font-semibold text-slate-500">= Día Libre</span>
               </div>
@@ -1902,10 +1904,12 @@
       return arr;
     }
 
-    // Construye un índice de todas las jornadas (cerradas y abiertas) agrupadas por Chofer y Fecha de Inicio
+    // Construye un índice de todas las jornadas (cerradas y abiertas) agrupadas por Chofer y Fecha de Inicio y Fin
     function buildShiftsByDriverDateMap() {
       const mapByCpfDate = new Map();
       const mapByNameDate = new Map();
+      const mapByCpfEndDate = new Map();
+      const mapByNameEndDate = new Map();
       const seenKeys = new Set();
 
       function addShiftRecord(cpfRaw, nameRaw, startIso, endIso, durationSec, codInicio, codFim, isOpen) {
@@ -1940,11 +1944,25 @@
           const k1 = `${cCpf}|${dt}`;
           if (!mapByCpfDate.has(k1)) mapByCpfDate.set(k1, []);
           mapByCpfDate.get(k1).push(rec);
+
+          if (endIso) {
+            const endDt = String(endIso).slice(0, 10);
+            const kEnd1 = `${cCpf}|${endDt}`;
+            if (!mapByCpfEndDate.has(kEnd1)) mapByCpfEndDate.set(kEnd1, []);
+            mapByCpfEndDate.get(kEnd1).push(rec);
+          }
         }
         if (cName) {
           const k2 = `${cName}|${dt}`;
           if (!mapByNameDate.has(k2)) mapByNameDate.set(k2, []);
           mapByNameDate.get(k2).push(rec);
+
+          if (endIso) {
+            const endDt = String(endIso).slice(0, 10);
+            const kEnd2 = `${cName}|${endDt}`;
+            if (!mapByNameEndDate.has(kEnd2)) mapByNameEndDate.set(kEnd2, []);
+            mapByNameEndDate.get(kEnd2).push(rec);
+          }
         }
       }
 
@@ -1989,6 +2007,10 @@
           const list = mapByCpfDate.get(`${cCpf}|${dt}`) || mapByNameDate.get(`${cName}|${dt}`) || [];
           return list.sort((a, b) => (a.startIso || '').localeCompare(b.startIso || ''));
         },
+        getShiftsEnding(cCpf, cName, dt) {
+          const list = mapByCpfEndDate.get(`${cCpf}|${dt}`) || mapByNameEndDate.get(`${cName}|${dt}`) || [];
+          return list.sort((a, b) => (a.endIso || '').localeCompare(b.endIso || ''));
+        },
         getAllDriverShifts(cCpf, cName) {
           const collected = [];
           const seen = new Set();
@@ -2017,6 +2039,18 @@
           return collected.sort((a, b) => (a.startIso || '').localeCompare(b.startIso || ''));
         }
       };
+    }
+
+    // Helper: verifica si el fin de jornada ocurrió a las 06:00 hs o posterior en la mañana (≥ 06:00 hs)
+    function isShiftEndAfterSixAm(endIso) {
+      if (!endIso) return false;
+      const m = String(endIso).match(/[T\s](\d{2}):(\d{2})/);
+      if (m) {
+        const hour = parseInt(m[1], 10);
+        return hour >= 6;
+      }
+      const d = new Date(endIso);
+      return !isNaN(d.getTime()) && d.getHours() >= 6;
     }
 
     // Clasifica el turno según la hora de inicio:
@@ -2079,6 +2113,9 @@
     function getMatrixFilterSelectClass(val) {
       if (val === 'P') {
         return 'w-full min-w-[50px] rounded-md border border-emerald-500 bg-emerald-50 text-emerald-800 text-[10px] font-extrabold py-0.5 px-1 focus:outline-none focus:ring-1 focus:ring-emerald-500 transition cursor-pointer shadow-sm';
+      }
+      if (val === 'P_ORANGE') {
+        return 'w-full min-w-[50px] rounded-md border border-orange-500 bg-orange-50 text-orange-800 text-[10px] font-extrabold py-0.5 px-1 focus:outline-none focus:ring-1 focus:ring-orange-500 transition cursor-pointer shadow-sm';
       }
       if (val === 'DL') {
         return 'w-full min-w-[50px] rounded-md border border-slate-500 bg-slate-200 text-slate-800 text-[10px] font-extrabold py-0.5 px-1 focus:outline-none focus:ring-1 focus:ring-slate-500 transition cursor-pointer shadow-sm';
@@ -2176,7 +2213,8 @@
                   <select id="filterSelect_${dt}" onchange="onMatrixFilterChange('date_${dt}', this.value)"
                     class="${getMatrixFilterSelectClass(currentVal)}">
                     <option value="">Todo</option>
-                    <option value="P" ${currentVal === 'P' ? 'selected' : ''}>P</option>
+                    <option value="P" ${currentVal === 'P' ? 'selected' : ''}>P (Todos)</option>
+                    <option value="P_ORANGE" ${currentVal === 'P_ORANGE' ? 'selected' : ''}>P (Naranja ≥06:00)</option>
                     <option value="DL" ${currentVal === 'DL' ? 'selected' : ''}>DL</option>
                   </select>
                 </th>
@@ -2256,22 +2294,53 @@
         for (const dt of dates) {
           const shifts = shiftIndex.getShifts(cCpf, cName, dt);
           const hasShift = shifts.length > 0;
-          const status = hasShift ? 'P' : 'DL';
-          dayStatus[dt] = status;
+          let status = 'DL';
+          let isOrange = false;
+          let orangeShift = null;
+
           if (hasShift) {
+            status = 'P';
+          } else {
+            const endingShifts = shiftIndex.getShiftsEnding(cCpf, cName, dt);
+            const morningEnd = endingShifts.find((s) => isShiftEndAfterSixAm(s.endIso));
+            if (morningEnd) {
+              status = 'P';
+              isOrange = true;
+              orangeShift = morningEnd;
+            }
+          }
+
+          dayStatus[dt] = isOrange ? 'P_ORANGE' : status;
+
+          if (status === 'P') {
             pCount++;
-            cellItems.push({
-              status: 'P',
-              html: `<td class="px-1.5 py-2.5 text-center">
-                <button type="button" onclick="openCellDetailModal('P', '${cCpf}', '${dt}')"
-                  title="Clic para ver Inicio, Fin y Tiempo Total de Jornada"
-                  class="inline-flex h-6 w-7 cursor-pointer items-center justify-center rounded-md bg-emerald-100 font-mono text-[11px] font-extrabold text-emerald-700 shadow-sm transition hover:scale-110 hover:bg-emerald-600 hover:text-white">P</button>
-              </td>`
-            });
+            if (isOrange) {
+              const endClock = orangeShift?.endIso ? (String(orangeShift.endIso).match(/[T\s](\d{2}:\d{2})/) ? String(orangeShift.endIso).match(/[T\s](\d{2}:\d{2})/)[1] : '') : '';
+              cellItems.push({
+                status: 'P',
+                isOrange: true,
+                html: `<td class="px-1.5 py-2.5 text-center">
+                  <button type="button" onclick="openCellDetailModal('P_ORANGE', '${cCpf}', '${dt}')"
+                    title="Fin de Jornada: ${endClock || '≥ 06:00'} hs (computado como Presente) · Clic para ver detalles"
+                    class="inline-flex h-6 w-7 cursor-pointer items-center justify-center rounded-md bg-orange-500 font-mono text-[11px] font-black text-white shadow-sm transition hover:scale-110 hover:bg-orange-600">P</button>
+                </td>`
+              });
+            } else {
+              cellItems.push({
+                status: 'P',
+                isOrange: false,
+                html: `<td class="px-1.5 py-2.5 text-center">
+                  <button type="button" onclick="openCellDetailModal('P', '${cCpf}', '${dt}')"
+                    title="Clic para ver Inicio, Fin y Tiempo Total de Jornada"
+                    class="inline-flex h-6 w-7 cursor-pointer items-center justify-center rounded-md bg-emerald-100 font-mono text-[11px] font-extrabold text-emerald-700 shadow-sm transition hover:scale-110 hover:bg-emerald-600 hover:text-white">P</button>
+                </td>`
+              });
+            }
           } else {
             dlCount++;
             cellItems.push({
               status: 'DL',
+              isOrange: false,
               html: `<td class="px-1.5 py-2.5 text-center">
                 <button type="button" onclick="openCellDetailModal('DL', '${cCpf}', '${dt}')"
                   title="Clic para ver Último Fin de Jornada y Horas de Interjornada"
@@ -2285,9 +2354,24 @@
         let dateFilterMatch = true;
         for (const dt of dates) {
           const reqStatus = state.matrixFilters.dateFilters[dt];
-          if (reqStatus && dayStatus[dt] !== reqStatus) {
-            dateFilterMatch = false;
-            break;
+          if (reqStatus) {
+            const cur = dayStatus[dt]; // 'P', 'P_ORANGE', 'DL'
+            if (reqStatus === 'P') {
+              if (cur !== 'P' && cur !== 'P_ORANGE') {
+                dateFilterMatch = false;
+                break;
+              }
+            } else if (reqStatus === 'P_ORANGE') {
+              if (cur !== 'P_ORANGE') {
+                dateFilterMatch = false;
+                break;
+              }
+            } else if (reqStatus === 'DL') {
+              if (cur !== 'DL') {
+                dateFilterMatch = false;
+                break;
+              }
+            }
           }
         }
         if (!dateFilterMatch) continue;
@@ -2479,7 +2563,91 @@
 
       const shiftIndex = buildShiftsByDriverDateMap();
 
-      if (mode === 'DL') {
+      if (mode === 'P_ORANGE') {
+        badge.className = 'inline-flex rounded-full bg-orange-100 border border-orange-300 px-3 py-0.5 text-[11px] font-extrabold text-orange-900';
+        badge.textContent = `P · FIN DE JORNADA EN LA MAÑANA (≥ 06:00 HS)`;
+
+        const endingShifts = shiftIndex.getShiftsEnding(cleanCpf, cName, dateIso);
+        const qualifyingShifts = endingShifts.filter((s) => isShiftEndAfterSixAm(s.endIso));
+        const primaryShift = qualifyingShifts.length > 0 ? qualifyingShifts[qualifyingShifts.length - 1] : (endingShifts[0] || null);
+
+        const allDriverShifts = shiftIndex.getAllDriverShifts(cleanCpf, cName);
+        const nextShift = primaryShift?.endIso
+          ? allDriverShifts.find((s) => s.startIso > primaryShift.endIso)
+          : null;
+
+        let restSec = 0;
+        let restContextLabel = '';
+        if (primaryShift?.endIso) {
+          if (nextShift?.startIso) {
+            restSec = Math.max(0, Math.floor((new Date(nextShift.startIso).getTime() - new Date(primaryShift.endIso).getTime()) / 1000));
+            restContextLabel = `Hasta su siguiente inicio de jornada (${formatDateTime(nextShift.startIso)})`;
+          } else {
+            restSec = Math.max(0, Math.floor((Date.now() - new Date(primaryShift.endIso).getTime()) / 1000));
+            restContextLabel = 'Tiempo acumulado desde ese fin de jornada hasta ahora';
+          }
+        }
+        const isGreenRest = (restSec / 3600) >= 12;
+
+        const endClock = primaryShift?.endIso ? (String(primaryShift.endIso).match(/[T\s](\d{2}:\d{2})/) ? String(primaryShift.endIso).match(/[T\s](\d{2}:\d{2})/)[1] : '') : '';
+
+        body.innerHTML = `
+          <div class="space-y-3">
+            <div class="rounded-xl border border-orange-200 bg-orange-50/80 p-3.5">
+              <div class="flex items-center gap-2 text-orange-900 font-bold text-xs">
+                <span class="inline-flex h-5 w-5 items-center justify-center rounded-full bg-orange-500 font-black text-white text-[10px]">P</span>
+                <span>Fin de Jornada a las ${endClock || '≥ 06:00'} hs de la mañana</span>
+              </div>
+              <p class="mt-1 text-xs text-orange-800">
+                El chofer culminó su jornada laboral a las 06:00 hs o posterior de este día, por lo cual se computa como <strong>Día Presente (P)</strong> en lugar de Día Libre.
+              </p>
+            </div>
+
+            ${primaryShift ? `
+              <div class="saas-subcard p-4 space-y-3">
+                <div class="flex items-center justify-between border-b border-slate-200/80 pb-2.5">
+                  <span class="text-xs font-extrabold text-slate-700">Detalles de la Jornada Finalizada</span>
+                  <span class="rounded-md bg-orange-100 px-2.5 py-0.5 font-mono text-xs font-extrabold text-orange-800">FIN ≥ 06:00 HS</span>
+                </div>
+
+                <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div class="rounded-xl bg-white p-3 border border-slate-200/80">
+                    <span class="text-[10px] font-bold uppercase text-slate-400">Inicio de Jornada</span>
+                    <p class="mt-0.5 font-mono text-xs font-extrabold text-slate-900">${formatDateTime(primaryShift.startIso)}</p>
+                  </div>
+
+                  <div class="rounded-xl bg-white p-3 border border-slate-200/80">
+                    <span class="text-[10px] font-bold uppercase text-slate-400">Fin de Jornada</span>
+                    <p class="mt-0.5 font-mono text-xs font-extrabold text-orange-900">${formatDateTime(primaryShift.endIso)}</p>
+                  </div>
+                </div>
+
+                <div class="flex items-center justify-between rounded-xl bg-orange-50/70 border border-orange-200 px-4 py-3">
+                  <span class="text-xs font-extrabold text-orange-900">Duración de su Jornada:</span>
+                  <span class="font-mono text-lg font-extrabold text-orange-700">${formatDurationHhMm(primaryShift.durationSec)}</span>
+                </div>
+              </div>
+
+              <div class="rounded-2xl border p-4 ${isGreenRest ? 'border-emerald-200 bg-emerald-50/70' : 'border-amber-200 bg-amber-50/70'}">
+                <span class="text-[11px] font-bold uppercase tracking-wider ${isGreenRest ? 'text-emerald-700' : 'text-amber-700'}">
+                  Descanso / Interjornada Posterior
+                </span>
+                <div class="mt-1 flex items-center justify-between gap-2">
+                  <span class="font-mono text-2xl font-extrabold ${isGreenRest ? 'text-emerald-800' : 'text-amber-800'}">
+                    ${formatDurationHhMm(restSec)}
+                  </span>
+                  <span class="rounded-full px-3 py-1 text-xs font-extrabold ${isGreenRest ? 'bg-emerald-600 text-white' : 'bg-amber-600 text-white'}">
+                    ${isGreenRest ? '≥ 12 HS CUMPLIDAS' : '< 12 HS DE DESCANSO'}
+                  </span>
+                </div>
+                ${restContextLabel ? `<p class="mt-1.5 text-[11px] font-medium text-slate-500">${restContextLabel}</p>` : ''}
+              </div>
+            ` : `
+              <div class="p-4 text-center text-slate-500">No se encontraron detalles completos de la jornada.</div>
+            `}
+          </div>
+        `;
+      } else if (mode === 'DL') {
         badge.className = 'inline-flex rounded-full bg-slate-200 px-3 py-0.5 text-[11px] font-extrabold text-slate-700';
         badge.textContent = `DL · DÍA LIBRE (${formattedDate})`;
 
@@ -2815,9 +2983,23 @@
         for (const dt of dates) {
           const shifts = shiftIndex.getShifts(cCpf, cName, dt);
           const has = shifts.length > 0;
-          const status = has ? 'P' : 'DL';
-          dayStatus[dt] = status;
+          let status = 'DL';
+          let isOrange = false;
+
           if (has) {
+            status = 'P';
+          } else {
+            const endingShifts = shiftIndex.getShiftsEnding(cCpf, cName, dt);
+            const morningEnd = endingShifts.find((s) => isShiftEndAfterSixAm(s.endIso));
+            if (morningEnd) {
+              status = 'P';
+              isOrange = true;
+            }
+          }
+
+          dayStatus[dt] = isOrange ? 'P_ORANGE' : status;
+
+          if (status === 'P') {
             pCount++;
             rowVals.push('P');
           } else {
@@ -2829,7 +3011,12 @@
         // Date column filters
         for (const dt of dates) {
           const req = state.matrixFilters.dateFilters[dt];
-          if (req && dayStatus[dt] !== req) return;
+          if (req) {
+            const cur = dayStatus[dt];
+            if (req === 'P' && cur !== 'P' && cur !== 'P_ORANGE') return;
+            if (req === 'P_ORANGE' && cur !== 'P_ORANGE') return;
+            if (req === 'DL' && cur !== 'DL') return;
+          }
         }
 
         // Total P / DL filters
